@@ -193,6 +193,123 @@ router.post('/register/verify', async (req, res) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+router.post('/auth/options', async (req, res) => {
+  const rawUsername = String(req.body.username ?? '').trim();
+  let allowCredentials; // left undefined for the usernameless path
+
+  if (rawUsername) {
+    const username = normaliseUsername(rawUsername);
+    const user = db.findUserByUsername(username);
+
+    // This tells an attacker whether a username exists. That is a deliberate
+    // trade-off, not an oversight: choosing a username at registration already
+    // reveals the same thing, and an accessible failure has to say what went
+    // wrong. Silently falling through to the passkey picker would leave a
+    // screen-reader user with a prompt that lists nothing and no explanation.
+    if (!user) {
+      throw new AuthError(
+        `There is no account with the username “${username}”. Check the spelling, or create an account.`,
+      );
+    }
+
+    const credentials = db.listCredentials(user.id);
+    if (credentials.length === 0) {
+      throw new AuthError(
+        'That account has no passkeys registered, so it cannot be signed in to yet.',
+      );
+    }
+
+    // Naming the account's credentials lets the browser go straight to the
+    // right passkey instead of asking the user to pick.
+    allowCredentials = credentials.map((credential) => ({
+      id: credential.id,
+      transports: credential.transports,
+    }));
+  }
+
+  const challenge = issueChallenge(req, 'authenticate');
+
+  const options = await generateAuthenticationOptions({
+    rpID: RP_ID,
+    challenge,
+    allowCredentials,
+    // REQUIRED — the UV flag is the second factor.
+    userVerification: 'required',
+  });
+
+  res.json(options);
+});
+
+router.post('/auth/verify', async (req, res) => {
+  // Read and delete the challenge before verifying anything: single use.
+  const challenge = consumeChallenge(req, 'authenticate');
+
+  const stored = db.findCredentialById(String(req.body.id ?? ''));
+  if (!stored) {
+    throw new AuthError(
+      'That passkey is not registered with this site. Try another passkey, or create an account.',
+    );
+  }
+
+  // Usernameless sign-in: the authenticator hands back the user handle it was
+  // given at registration, and the account is looked up from that. Both are
+  // base64url strings, so they compare directly.
+  const userHandle = req.body.response?.userHandle;
+  if (userHandle) {
+    const claimed = db.findUserByHandle(userHandle);
+    if (!claimed || claimed.id !== stored.userId) {
+      throw new AuthError('That passkey does not match the account it claims. Please try again.');
+    }
+  }
+
+  const verification = await explainFailures('authenticate', () =>
+    verifyAuthenticationResponse({
+      response: req.body,
+      expectedChallenge: challenge.value,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+      credential: {
+        id: stored.id,
+        publicKey: stored.publicKey,
+        counter: stored.counter,
+        transports: stored.transports,
+      },
+      requireUserVerification: true,
+    }),
+  );
+
+  const { verified, authenticationInfo } = verification;
+  if (!verified) {
+    throw new AuthError('That passkey could not be verified. Please try again.');
+  }
+
+  // Same belt-and-braces check as registration: never accept an assertion
+  // without the user-verification flag, because that flag is what makes this
+  // multi-factor rather than possession of the device alone.
+  if (!authenticationInfo.userVerified) {
+    throw new AuthError(
+      'Your device did not confirm it was you, so you were not signed in. Please try again and complete the fingerprint, face or PIN check.',
+    );
+  }
+
+  assertCounterIsSane(stored.counter, authenticationInfo.newCounter);
+
+  db.recordCredentialUse({
+    id: stored.id,
+    counter: authenticationInfo.newCounter,
+    backedUp: authenticationInfo.credentialBackedUp,
+  });
+
+  const user = db.findUserById(stored.userId);
+  await startSession(req, user);
+
+  res.json({ verified: true, username: user.username, next: '/account' });
+});
+
 /**
  * @simplewebauthn/server reports every verification failure as a plain Error
  * with a developer-facing message ("User verification required, but user could
@@ -236,6 +353,26 @@ function translateVerificationError(message, context) {
   return context === 'register'
     ? 'That passkey could not be verified, so it was not saved. Please try again.'
     : 'That passkey could not be verified, so you were not signed in. Please try again.';
+}
+
+/**
+ * The signature counter is a cloning detector: a real authenticator increments
+ * it on every assertion, so a counter that goes backwards suggests a copy of
+ * the credential is in use.
+ *
+ * The catch: synced passkeys (iCloud Keychain, Google Password Manager) cannot
+ * keep a counter in step across devices, so they report 0 every single time.
+ * Rejecting "not greater than stored" would let such a user sign in once and
+ * then lock them out forever. Zero on both sides means the authenticator does
+ * not implement the counter, so there is nothing to compare.
+ */
+function assertCounterIsSane(storedCounter, newCounter) {
+  if (storedCounter === 0 && newCounter === 0) return;
+  if (newCounter > storedCounter) return;
+
+  throw new AuthError(
+    'This passkey reported an out-of-date use count, which can mean it has been copied. It was not accepted. Please use another passkey.',
+  );
 }
 
 export default router;
