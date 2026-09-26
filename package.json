@@ -1,0 +1,20 @@
+{
+  "name": "accessible-mfa",
+  "version": "0.1.0",
+  "description": "Accessible multi-factor authentication prototype (CS3053, Secure Sons)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.3",
+    "better-sqlite3": "^13.0.3",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0"
+  }
+}
