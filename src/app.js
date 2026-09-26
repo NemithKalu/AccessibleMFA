@@ -10,6 +10,7 @@ import { SESSION_SECRET, ORIGIN } from './config.js';
 import { findUserById } from './db.js';
 import { AuthError } from './errors.js';
 import pagesRouter from './routes/pages.js';
+import webauthnRouter from './routes/webauthn.js';
 import authRouter from './routes/auth.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -53,6 +54,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/', pagesRouter);
+app.use('/webauthn', webauthnRouter);
 app.use('/', authRouter);
 
 app.use((req, res) => {
