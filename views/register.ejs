@@ -1,0 +1,77 @@
+<%- include('partials/header', { title: title }) %>
+
+<h1>Create your account</h1>
+
+<p>
+  Choose a username, then create a passkey on this device. You will not need a
+  password.
+</p>
+
+<%- include('partials/status') %>
+
+<form id="register-form" novalidate>
+  <div class="field">
+    <label for="username">Username</label>
+    <p class="hint" id="username-hint">
+      3 to 32 characters. Letters, numbers, dots, dashes and underscores.
+    </p>
+    <input
+      type="text"
+      id="username"
+      name="username"
+      autocomplete="username webauthn"
+      aria-describedby="username-hint"
+      autocapitalize="none"
+      spellcheck="false"
+      required
+    />
+  </div>
+
+  <div class="field">
+    <label for="display-name">Display name</label>
+    <p class="hint" id="display-name-hint">
+      Optional. The name your device will show you when it asks about this
+      passkey.
+    </p>
+    <input
+      type="text"
+      id="display-name"
+      name="displayName"
+      aria-describedby="display-name-hint"
+    />
+  </div>
+
+  <div class="field">
+    <label for="device-name">A name for this passkey</label>
+    <p class="hint" id="device-name-hint">
+      Optional, for example “Work laptop” or “Blue security key”. It helps you
+      recognise this passkey later in your list.
+    </p>
+    <input
+      type="text"
+      id="device-name"
+      name="deviceName"
+      aria-describedby="device-name-hint"
+    />
+  </div>
+
+  <!--
+    Accessibility rule: say what is about to happen, in text, BEFORE the
+    passkey prompt appears. The prompt itself is drawn by the operating
+    system and can arrive without warning.
+  -->
+  <div class="prompt-notice">
+    <h2>What happens when you select Create account</h2>
+    <p>
+      <strong><%= origin %></strong> will ask <strong>this device</strong>, or a
+      security key you plug in, to create a passkey. Your device will then check
+      it is you using your fingerprint, your face or your device PIN.
+    </p>
+  </div>
+
+  <p>
+    <button type="submit" id="submit">Create account with a passkey</button>
+  </p>
+</form>
+
+<%- include('partials/footer', { script: '/js/register.js' }) %>

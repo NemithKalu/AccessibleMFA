@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> — Accessible MFA demo</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <!-- First tab stop on every page: lets a keyboard user jump the nav. -->
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header>
+      <nav aria-label="Main">
+        <ul>
+          <li><a href="/">Home</a></li>
+          <% if (currentUser) { %>
+            <li><a href="/account">Your account</a></li>
+            <li>
+              <form method="post" action="/signout">
+                <button class="secondary" type="submit">Sign out</button>
+              </form>
+            </li>
+          <% } else { %>
+            <li><a href="/register">Create an account</a></li>
+            <li><a href="/signin">Sign in</a></li>
+          <% } %>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main">

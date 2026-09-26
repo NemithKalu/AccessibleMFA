@@ -1,0 +1,153 @@
+/* Deliberately plain. Every rule here exists for legibility or for keyboard
+   and screen-reader users — nothing decorative. */
+
+:root {
+  --ink: #16191d;
+  --paper: #ffffff;
+  --muted: #454c55;
+  --line: #b9c0c8;
+  --accent: #0b4f9c;
+  --focus: #b8460e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 1.05rem/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 1rem; }
+h2 { font-size: 1.3rem; margin: 2rem 0 0.5rem; }
+
+a { color: var(--accent); }
+
+/* A visible focus indicator on everything interactive. Never remove this:
+   a keyboard or low-vision user has no other way to tell where they are. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.6rem 1rem;
+}
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 10;
+}
+
+header {
+  border-bottom: 2px solid var(--line);
+  padding: 0.75rem 1rem;
+}
+header nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 44rem;
+}
+header nav form { margin: 0; }
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.hint {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0 0 0.35rem;
+}
+
+input[type="text"] {
+  font: inherit;
+  padding: 0.55rem 0.6rem;
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  width: 100%;
+  max-width: 22rem;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--paper);
+  cursor: pointer;
+}
+button.secondary { background: var(--paper); color: var(--accent); }
+button[disabled] { opacity: 0.6; cursor: progress; }
+
+.field { margin-bottom: 1.25rem; }
+
+/* The live region. Outcomes carry a word ("Success:", "Could not ...") as well
+   as a colour, so meaning never depends on seeing the colour. */
+.status {
+  margin: 1.25rem 0;
+  padding: 0.75rem 0.9rem;
+  border-left: 6px solid var(--line);
+  background: #f2f4f6;
+  min-height: 1.5rem;
+}
+.status:empty { display: none; }
+.status[data-tone="success"] { border-left-color: #1d6b3a; background: #eaf5ee; }
+.status[data-tone="error"] { border-left-color: #a32020; background: #fbecec; }
+
+.divider {
+  margin: 2rem 0;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+
+.prompt-notice {
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  padding: 0.75rem 0.9rem;
+  background: #f7f9fb;
+}
+
+ul.devices { list-style: none; padding: 0; }
+ul.devices li {
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.75rem;
+}
+ul.devices h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+ul.devices dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem; }
+ul.devices dt { font-weight: 600; color: var(--muted); }
+ul.devices dd { margin: 0; }
+
+footer {
+  border-top: 2px solid var(--line);
+  color: var(--muted);
+  padding: 1rem;
+  font-size: 0.95rem;
+}
+footer p { max-width: 44rem; margin: 0 auto; }

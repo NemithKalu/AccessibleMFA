@@ -1,0 +1,30 @@
+<%- include('partials/header') %>
+
+<h1>Accessible MFA demo</h1>
+
+<p>
+  This is a demonstration of passkey sign-in built to be usable with a screen
+  reader and a keyboard alone. There is no password, no CAPTCHA, no QR code to
+  photograph and no image to compare.
+</p>
+
+<h2>How signing in works here</h2>
+<ol>
+  <li>Your device stores a passkey. The private key never leaves it.</li>
+  <li>
+    When you sign in, this site asks your device to prove it holds that key.
+  </li>
+  <li>
+    Your device only agrees after it has checked it is you — a fingerprint, a
+    face or a device PIN. That check is the second factor.
+  </li>
+</ol>
+
+<% if (currentUser) { %>
+  <p>You are signed in as <strong><%= currentUser.username %></strong>.</p>
+  <p><a href="/account">Go to your account</a></p>
+<% } else { %>
+  <p><a href="/register">Create an account</a> or <a href="/signin">sign in</a>.</p>
+<% } %>
+
+<%- include('partials/footer') %>

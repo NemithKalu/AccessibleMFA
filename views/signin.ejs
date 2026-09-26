@@ -1,0 +1,56 @@
+<%- include('partials/header', { title: title }) %>
+
+<h1>Sign in</h1>
+
+<p>Sign in with the passkey you created. There is no password to type.</p>
+
+<%- include('partials/status') %>
+
+<!--
+  Accessibility rule: say what is about to happen, in text, before the
+  operating system's passkey prompt appears.
+-->
+<div class="prompt-notice">
+  <h2>What happens when you sign in</h2>
+  <p>
+    <strong><%= origin %></strong> will ask <strong>this device</strong>, or a
+    security key you plug in, to prove it holds your passkey. Your device will
+    check it is you using your fingerprint, your face or your device PIN.
+  </p>
+</div>
+
+<h2>Sign in without typing</h2>
+<p>
+  If your passkey is on this device, it can offer you the right account
+  directly.
+</p>
+<p>
+  <button type="button" id="passkey-button">Sign in with a passkey</button>
+</p>
+
+<p class="divider">— or —</p>
+
+<h2>Sign in with your username</h2>
+<form id="signin-form" novalidate>
+  <div class="field">
+    <label for="username">Username</label>
+    <p class="hint" id="username-hint">
+      Use this if your passkey is on another device or a security key.
+    </p>
+    <input
+      type="text"
+      id="username"
+      name="username"
+      autocomplete="username webauthn"
+      aria-describedby="username-hint"
+      autocapitalize="none"
+      spellcheck="false"
+      required
+    />
+  </div>
+  <p><button type="submit" id="submit">Continue</button></p>
+</form>
+
+<p>No account yet? <a href="/register">Create one</a>.</p>
+
+<%- include('partials/footer', { script: '/js/signin.js' }) %>

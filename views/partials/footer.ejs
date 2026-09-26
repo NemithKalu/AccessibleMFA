@@ -1,0 +1,15 @@
+    </main>
+
+    <footer>
+      <p>Accessible MFA — CS3053 prototype (Secure Sons). Demonstration only.</p>
+    </footer>
+
+    <% if (typeof script !== 'undefined' && script) { %>
+      <!-- @simplewebauthn/browser, served from node_modules as a UMD bundle.
+           It exposes window.SimpleWebAuthnBrowser. No build step involved. -->
+      <script src="/vendor/index.umd.min.js" defer></script>
+      <script src="/js/webauthn-client.js" defer></script>
+      <script src="<%= script %>" defer></script>
+    <% } %>
+  </body>
+</html>

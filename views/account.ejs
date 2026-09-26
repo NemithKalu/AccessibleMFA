@@ -1,0 +1,112 @@
+<%- include('partials/header', { title: title }) %>
+
+<%# tabindex="-1" so focus can be moved here after signing in; data-autofocus
+    tells account.js to do it. %>
+<h1 tabindex="-1" <%= arrivalMessage ? 'data-autofocus' : '' %>>Your account</h1>
+
+<% if (arrivalMessage) { %>
+  <p class="status" data-tone="success"><%= arrivalMessage %></p>
+<% } %>
+
+<p>
+  Signed in as <strong><%= user.username %></strong><% if (user.display_name && user.display_name !== user.username) { %>
+  (<%= user.display_name %>)<% } %>.
+</p>
+
+<%- include('partials/status') %>
+
+<h2>Your passkeys</h2>
+
+<% if (credentials.length === 0) { %>
+  <p>
+    You have no passkeys on this account yet. Add one below so you can sign in
+    again.
+  </p>
+<% } else { %>
+  <ul class="devices">
+    <% credentials.forEach(function (credential, index) { %>
+      <li>
+        <h3><%= credential.deviceName %></h3>
+        <dl>
+          <dt>Added</dt>
+          <dd><%= new Date(credential.createdAt).toLocaleString('en-GB') %></dd>
+          <dt>Last used</dt>
+          <dd>
+            <%= credential.lastUsedAt
+                  ? new Date(credential.lastUsedAt).toLocaleString('en-GB')
+                  : 'Not used yet' %>
+          </dd>
+          <dt>Where the key lives</dt>
+          <dd>
+            <%#
+              The BE/BS flags reported by the authenticator. The brief calls
+              passkeys device-bound, and a security key genuinely is — but the
+              platform authenticators on macOS, iOS, Android and Windows sync
+              credentials to the user's cloud account. Saying which is which is
+              honest, and it matters: a synced passkey survives losing the
+              device, a device-bound one does not.
+            %>
+            <% if (credential.backedUp) { %>
+              Synced to your cloud account, so it survives losing this device
+            <% } else if (credential.backupEligible) { %>
+              On this device, not yet synced to your cloud account
+            <% } else { %>
+              Bound to this device or security key only
+            <% } %>
+          </dd>
+        </dl>
+      </li>
+    <% }); %>
+  </ul>
+<% } %>
+
+<h2>Add another passkey</h2>
+
+<%#
+  A restricted fallback session (Phase 2: signed in with a recovery code or a
+  trusted-phone code) may browse normally but must not change credentials. The
+  form is withheld rather than shown and then refused — offering a control that
+  cannot work, and only explaining after the user commits to it, is exactly the
+  pattern that wastes a screen-reader user's time.
+%>
+<% if (sessionLevel !== 'full') { %>
+  <p>
+    You are signed in using a backup method, so you cannot add or change
+    passkeys right now. Sign in with an existing passkey to make this change.
+  </p>
+<% } else { %>
+
+<p>
+  Adding a second passkey — on another device or a security key — means losing
+  one device does not lock you out.
+</p>
+
+<form id="add-passkey-form" novalidate>
+  <div class="field">
+    <label for="device-name">A name for this passkey</label>
+    <p class="hint" id="device-name-hint">
+      Optional, for example “Phone” or “Blue security key”.
+    </p>
+    <input
+      type="text"
+      id="device-name"
+      name="deviceName"
+      aria-describedby="device-name-hint"
+    />
+  </div>
+
+  <div class="prompt-notice">
+    <h3>What happens when you add a passkey</h3>
+    <p>
+      <strong><%= origin %></strong> will ask <strong>this device</strong>, or a
+      security key you plug in, to create a passkey, then check it is you using
+      your fingerprint, your face or your device PIN.
+    </p>
+  </div>
+
+  <p><button type="submit" id="submit">Add a passkey</button></p>
+</form>
+
+<% } %>
+
+<%- include('partials/footer', { script: '/js/account.js' }) %>
