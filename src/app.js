@@ -12,6 +12,7 @@ import { AuthError } from './errors.js';
 import pagesRouter from './routes/pages.js';
 import webauthnRouter from './routes/webauthn.js';
 import authRouter from './routes/auth.js';
+import accountRouter from './routes/account.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const app = express();
@@ -56,6 +57,7 @@ app.use((req, res, next) => {
 app.use('/', pagesRouter);
 app.use('/webauthn', webauthnRouter);
 app.use('/', authRouter);
+app.use('/', accountRouter);
 
 app.use((req, res) => {
   res.status(404).render('error', {

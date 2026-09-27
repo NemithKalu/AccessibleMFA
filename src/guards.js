@@ -30,5 +30,7 @@ export function requireFullSession(req, res, next) {
       403,
     );
   }
-  next();
+  // Load the user as requireSession would, so routes behind this guard can
+  // rely on res.locals.user whichever guard they were mounted with.
+  requireSession(req, res, next);
 }

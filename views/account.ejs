@@ -60,6 +60,26 @@
   </ul>
 <% } %>
 
+<h2>Recovery codes</h2>
+
+<%#
+  Shown by count only. The codes are stored as hashes and can never be listed
+  again, which is exactly the property that makes a stolen database useless.
+%>
+<% if (recoveryCodesRemaining > 0) { %>
+  <p>
+    You have <strong><%= recoveryCodesRemaining %></strong> unused recovery
+    <%= recoveryCodesRemaining === 1 ? 'code' : 'codes' %>.
+    <a href="/recovery-codes">Manage your recovery codes</a>.
+  </p>
+<% } else { %>
+  <p>
+    You have no recovery codes. Without one, losing every device that holds a
+    passkey would lock you out of this account.
+    <a href="/recovery-codes">Create recovery codes</a>.
+  </p>
+<% } %>
+
 <h2>Add another passkey</h2>
 
 <%#

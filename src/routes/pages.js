@@ -1,7 +1,7 @@
 // Server-rendered pages.
 
 import { Router } from 'express';
-import { listCredentials } from '../db.js';
+import { countUnusedRecoveryCodes, listCredentials } from '../db.js';
 import { requireSession } from '../guards.js';
 
 const router = Router();
@@ -33,6 +33,7 @@ router.get('/account', requireSession, (req, res) => {
     title: 'Your account',
     user: res.locals.user,
     credentials: listCredentials(res.locals.user.id),
+    recoveryCodesRemaining: countUnusedRecoveryCodes(res.locals.user.id),
     arrivalMessage: ARRIVAL_MESSAGES[req.query.from] ?? null,
   });
 });

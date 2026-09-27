@@ -1,0 +1,88 @@
+<%- include('partials/header', { title: title }) %>
+
+<%# Focus lands here after generating, so a screen reader starts at the
+    heading and reads down into the list, rather than jumping into the codes. %>
+<h1 tabindex="-1" <%= codes ? 'data-autofocus' : '' %>><%= title %></h1>
+
+<%- include('partials/status') %>
+
+<% if (codes) { %>
+
+  <p class="status" data-tone="success">
+    Your <%= codes.length %> recovery codes are ready. They are listed below
+    under the heading “Your codes”. This is the only time they are shown.
+  </p>
+
+  <%#
+    The codes are deliberately NOT put in the aria-live region. Accessibility
+    rule: never auto-speak a secret. Somebody standing nearby, or a call that
+    is being recorded, should not hear them read out unprompted. The user
+    navigates to them and reads them when they are ready.
+  %>
+
+  <h2 id="your-codes">Your codes</h2>
+
+  <p>
+    Save these somewhere safe and away from the device you sign in with. Each
+    code works <strong>once</strong>. You will need one, plus a 24 hour wait,
+    to get back in if you lose every device that holds a passkey.
+  </p>
+
+  <ol class="codes">
+    <% codes.forEach(function (code) { %>
+      <li><code><%= code %></code></li>
+    <% }); %>
+  </ol>
+
+  <p>
+    <button type="button" id="download">Download these codes as a text file</button>
+  </p>
+  <p class="hint" id="download-hint">
+    The file is put together by your browser from the list above, so the codes
+    are not sent anywhere. If the button does not work, copy the list by hand.
+  </p>
+
+  <p><a href="/account">Back to your account</a></p>
+
+<% } else { %>
+
+  <p>
+    Recovery codes are your way back in if you lose every device that holds a
+    passkey. Each code is used once.
+  </p>
+
+  <% if (remaining > 0) { %>
+    <p>
+      You have <strong><%= remaining %></strong> unused
+      <%= remaining === 1 ? 'code' : 'codes' %> left. The codes themselves are
+      stored only as hashes, so they cannot be shown to you again.
+    </p>
+  <% } else { %>
+    <p>You have no unused recovery codes.</p>
+  <% } %>
+
+  <h2>Create a new set</h2>
+
+  <% if (sessionLevel !== 'full') { %>
+    <%#
+      A restricted session may look but not change. The form is withheld
+      rather than shown and then refused, so nobody is sent down a path that
+      was never going to work.
+    %>
+    <p>
+      You are signed in using a backup method, so you cannot create recovery
+      codes right now. Sign in with a passkey to make this change.
+    </p>
+  <% } else { %>
+    <p>
+      <strong>Creating a new set cancels the old one.</strong> Any code you
+      wrote down before will stop working straight away.
+    </p>
+    <form method="post" action="/recovery-codes">
+      <p><button type="submit">Create <%= remaining > 0 ? 'a new set of' : '' %> recovery codes</button></p>
+    </form>
+  <% } %>
+
+<% } %>
+
+<%- include('partials/footer', { script: '/js/recovery-codes.js' }) %>

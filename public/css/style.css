@@ -151,3 +151,13 @@ footer {
   font-size: 0.95rem;
 }
 footer p { max-width: 44rem; margin: 0 auto; }
+
+ol.codes {
+  font-size: 1.15rem;
+  line-height: 1.9;
+  padding-left: 2.2rem;
+}
+ol.codes code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+}

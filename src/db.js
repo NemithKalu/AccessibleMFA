@@ -47,6 +47,28 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_credentials_user ON credentials(user_id);
+
+  -- One row per recovery code. Only the hash is stored, and used_at is what
+  -- makes a code single use: once it is set, the code can never match again.
+  CREATE TABLE IF NOT EXISTS recovery_codes (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code_hash  TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    used_at    TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_recovery_codes_user ON recovery_codes(user_id);
+
+  -- A plain record of security-relevant events, shown to the user on /activity.
+  -- Never holds a secret: the event says a recovery code was used, not which.
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    event      TEXT NOT NULL,
+    detail     TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 const now = () => new Date().toISOString();
@@ -114,6 +136,69 @@ export function recordCredentialUse({ id, counter, backedUp }) {
   db.prepare(
     'UPDATE credentials SET counter = ?, backed_up = ?, last_used_at = ? WHERE id = ?',
   ).run(counter, backedUp ? 1 : 0, now(), id);
+}
+
+// ---------------------------------------------------------------------------
+// Recovery codes
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace the whole set. Generating a new set always invalidates the old one,
+ * so a code written down last year cannot be used after a re-generation.
+ * One transaction, so a half-replaced set can never be left behind.
+ */
+export const replaceRecoveryCodes = db.transaction((userId, codeHashes) => {
+  db.prepare('DELETE FROM recovery_codes WHERE user_id = ?').run(userId);
+  const insert = db.prepare(
+    'INSERT INTO recovery_codes (user_id, code_hash, created_at) VALUES (?, ?, ?)',
+  );
+  for (const hash of codeHashes) insert.run(userId, hash, now());
+});
+
+export function countUnusedRecoveryCodes(userId) {
+  return db
+    .prepare(
+      'SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL',
+    )
+    .get(userId).n;
+}
+
+/** Find an unused code by its hash. Returns undefined if used or unknown. */
+export function findUnusedRecoveryCode(userId, codeHash) {
+  return db
+    .prepare(
+      `SELECT * FROM recovery_codes
+       WHERE user_id = ? AND code_hash = ? AND used_at IS NULL`,
+    )
+    .get(userId, codeHash);
+}
+
+/**
+ * Burn a code. The WHERE clause repeats "used_at IS NULL" so that two requests
+ * racing with the same code can only ever spend it once — the second UPDATE
+ * matches no rows.
+ */
+export function useRecoveryCode(id) {
+  const info = db
+    .prepare('UPDATE recovery_codes SET used_at = ? WHERE id = ? AND used_at IS NULL')
+    .run(now(), id);
+  return info.changes === 1;
+}
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+export function addAuditEntry({ userId, event, detail }) {
+  db.prepare(
+    'INSERT INTO audit_log (user_id, event, detail, created_at) VALUES (?, ?, ?, ?)',
+  ).run(userId, event, detail, now());
+}
+
+export function listAuditEntries(userId) {
+  return db
+    .prepare('SELECT * FROM audit_log WHERE user_id = ? ORDER BY id DESC LIMIT 50')
+    .all(userId);
 }
 
 function toCredential(row) {
