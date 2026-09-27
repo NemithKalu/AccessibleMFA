@@ -63,6 +63,20 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_recovery_codes_user ON recovery_codes(user_id);
 
+  -- A request to replace every passkey on an account, started with recovery
+  -- evidence and held for a waiting period before it can be used.
+  CREATE TABLE IF NOT EXISTS recovery_requests (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- What the user proved to start this. Phase 2 adds 'trusted-phone'.
+    evidence     TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    -- The moment the waiting period ends. Stored, not recalculated, so
+    -- changing the configured wait cannot shorten a request already running.
+    activates_at TEXT NOT NULL,
+    status       TEXT NOT NULL -- pending | cancelled | completed
+  );
+
   -- A plain record of security-relevant events, shown to the user on /activity.
   -- Never holds a secret: the event says a recovery code was used, not which.
   CREATE TABLE IF NOT EXISTS audit_log (
@@ -204,6 +218,42 @@ export function useRecoveryCode(id) {
   const info = db
     .prepare('UPDATE recovery_codes SET used_at = ? WHERE id = ? AND used_at IS NULL')
     .run(now(), id);
+  return info.changes === 1;
+}
+
+// ---------------------------------------------------------------------------
+// Recovery requests
+// ---------------------------------------------------------------------------
+
+export function createRecoveryRequest({ userId, evidence, activatesAt }) {
+  const info = db
+    .prepare(
+      `INSERT INTO recovery_requests (user_id, evidence, created_at, activates_at, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+    )
+    .run(userId, evidence, now(), activatesAt);
+  return db.prepare('SELECT * FROM recovery_requests WHERE id = ?').get(info.lastInsertRowid);
+}
+
+/** The one request still running, if any. */
+export function findPendingRecoveryRequest(userId) {
+  return db
+    .prepare(
+      `SELECT * FROM recovery_requests
+       WHERE user_id = ? AND status = 'pending'
+       ORDER BY id DESC LIMIT 1`,
+    )
+    .get(userId);
+}
+
+/**
+ * Finish a request. The "status = 'pending'" in the WHERE clause is the guard
+ * that makes cancellation stick: once cancelled, nothing can complete it.
+ */
+export function settleRecoveryRequest(id, status) {
+  const info = db
+    .prepare("UPDATE recovery_requests SET status = ? WHERE id = ? AND status = 'pending'")
+    .run(status, id);
   return info.changes === 1;
 }
 

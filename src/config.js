@@ -21,3 +21,13 @@ export const CHALLENGE_TTL_MS = 2 * 60 * 1000;
 
 // Dev-only default. A real deployment would require this to be set.
 export const SESSION_SECRET = process.env.SESSION_SECRET ?? 'dev-only-insecure-session-secret';
+
+// How long a passkey replacement request has to wait before it can be used.
+//
+// This delay is the whole defence for the recovery route: someone who steals
+// a recovery code cannot use it immediately, and the real owner is told and
+// has a day to cancel. Overridable so the demo and the tests do not have to
+// wait 24 hours.
+export const RECOVERY_WAIT_MS = Number(
+  process.env.AMFA_RECOVERY_WAIT_MS ?? 24 * 60 * 60 * 1000,
+);

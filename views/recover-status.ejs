@@ -1,0 +1,88 @@
+<%- include('partials/header', { title: title }) %>
+
+<h1 tabindex="-1" data-autofocus><%= title %></h1>
+
+<%- include('partials/status') %>
+
+<% if (!request) { %>
+
+  <p>
+    There is no passkey replacement running on your account.
+    <% if (sessionLevel === 'full') { %>
+      Your passkeys are unchanged.
+    <% } %>
+  </p>
+  <p><a href="/account">Go to your account</a></p>
+
+<% } else if (!matured) { %>
+
+  <h2>Waiting</h2>
+  <%#
+    The remaining time is written out in words and the exact moment is given
+    in full. A ticking visual countdown would be unreadable to a screen reader
+    and would keep interrupting it; WCAG 2.2 also asks that a time limit be
+    something the user can actually understand and plan around.
+  %>
+  <p>
+    You can register a new passkey after
+    <strong><%= readyAt %></strong>. That is about
+    <strong><%= remaining %></strong> from now.
+  </p>
+  <p>
+    Nothing on your account has changed yet. Your existing passkeys still
+    work, and we have told you about this request on your other contact
+    channels.
+  </p>
+  <p>
+    <a href="/recover/status">Check the remaining time again</a> — the page
+    does not refresh by itself.
+  </p>
+
+<% } else { %>
+
+  <h2>Ready</h2>
+  <p>
+    The waiting period has finished. Register a new passkey below. When you
+    do, <strong>every passkey currently on this account will be turned off</strong>
+    and anything still signed in with one will be signed out.
+  </p>
+
+  <div class="prompt-notice">
+    <h3>What happens when you select Register a new passkey</h3>
+    <p>
+      <strong><%= origin %></strong> will ask <strong>this device</strong>, or
+      a security key you plug in, to create a passkey, then check it is you
+      using your fingerprint, your face or your device PIN.
+    </p>
+  </div>
+
+  <form id="replace-form" novalidate>
+    <div class="field">
+      <label for="device-name">A name for this passkey</label>
+      <p class="hint" id="device-name-hint">
+        Optional, for example “New phone”.
+      </p>
+      <input
+        type="text"
+        id="device-name"
+        name="deviceName"
+        aria-describedby="device-name-hint"
+      />
+    </div>
+    <p><button type="submit" id="submit">Register a new passkey</button></p>
+  </form>
+
+<% } %>
+
+<% if (request) { %>
+  <h2>If this was not you</h2>
+  <p>
+    Cancelling stops the replacement. Your existing passkeys keep working and
+    nothing is turned off.
+  </p>
+  <form method="post" action="/recover/cancel">
+    <p><button class="danger" type="submit">Cancel this replacement</button></p>
+  </form>
+<% } %>
+
+<%- include('partials/footer', { script: '/js/recover.js' }) %>

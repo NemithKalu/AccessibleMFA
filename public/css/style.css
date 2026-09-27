@@ -176,3 +176,13 @@ ol.codes code {
 .device-actions .field { margin-bottom: 0.6rem; }
 .device-actions form { display: inline-block; margin: 0 0.4rem 0.4rem 0; vertical-align: top; }
 button.danger { background: #a32020; }
+
+.prompt-notice[data-tone="error"] { border-left: 4px solid #a32020; background: #fbecec; }
+
+ul.activity { list-style: none; padding: 0; }
+ul.activity li {
+  border-top: 1px solid var(--line);
+  padding: 0.7rem 0;
+}
+ul.activity p { margin: 0; }
+ul.activity .when { font-size: 0.85rem; color: var(--muted); }

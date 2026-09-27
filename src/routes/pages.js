@@ -1,7 +1,8 @@
 // Server-rendered pages.
 
 import { Router } from 'express';
-import { countUnusedRecoveryCodes, listActiveCredentials, listCredentials } from '../db.js';
+import * as db from '../db.js';
+import { listAuditEntries } from '../db.js';
 import { requireSession } from '../guards.js';
 
 const router = Router();
@@ -31,6 +32,8 @@ const ARRIVAL_MESSAGES = {
   added: 'Your new passkey was added.',
   renamed: 'That passkey was renamed.',
   revoked: 'That passkey was turned off and can no longer be used to sign in.',
+  cancelled: 'The passkey replacement was cancelled. Nothing on your account changed.',
+  recovered: 'Your new passkey is registered and your older passkeys were turned off.',
 };
 
 // Shown on the sign-in page. Separate list, so /account messages cannot be
@@ -38,18 +41,34 @@ const ARRIVAL_MESSAGES = {
 const SIGNIN_MESSAGES = {
   revoked:
     'That passkey was turned off, so you were signed out. Sign in with another passkey, or use a recovery code.',
+  cancelled:
+    'The passkey replacement was cancelled and you were signed out of the restricted session. Your existing passkeys still work.',
 };
 
 router.get('/account', requireSession, (req, res) => {
   res.render('account', {
     title: 'Your account',
     user: res.locals.user,
-    credentials: listCredentials(res.locals.user.id),
-    activeCount: listActiveCredentials(res.locals.user.id).length,
+    credentials: db.listCredentials(res.locals.user.id),
+    activeCount: db.listActiveCredentials(res.locals.user.id).length,
     // Lets the list mark the passkey this browser is signed in with.
     currentCredentialId: req.session.credentialId ?? null,
-    recoveryCodesRemaining: countUnusedRecoveryCodes(res.locals.user.id),
+    recoveryCodesRemaining: db.countUnusedRecoveryCodes(res.locals.user.id),
+    // Surfaced at the top of the page: somebody signing in normally must be
+    // told at once that a replacement is running, because they are the person
+    // who can cancel it.
+    pendingRecovery: db.findPendingRecoveryRequest(res.locals.user.id),
     arrivalMessage: ARRIVAL_MESSAGES[req.query.from] ?? null,
+  });
+});
+
+// The audit log. Read only, and shown to restricted sessions too — seeing
+// what has happened to your own account is exactly what someone who suspects
+// a takeover needs, and it reveals nothing an attacker does not already know.
+router.get('/activity', requireSession, (req, res) => {
+  res.render('activity', {
+    title: 'Account activity',
+    entries: listAuditEntries(res.locals.user.id),
   });
 });
 

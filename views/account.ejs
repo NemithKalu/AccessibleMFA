@@ -8,6 +8,23 @@
   <p class="status" data-tone="success"><%= arrivalMessage %></p>
 <% } %>
 
+<%#
+  The single most important thing on this page if it is true. Put before
+  everything else so a screen reader reaches it first, and worded as an
+  instruction rather than a status, because the reader may be the only person
+  who can stop it.
+%>
+<% if (pendingRecovery) { %>
+  <div class="prompt-notice" data-tone="error">
+    <h2>Someone is replacing the passkeys on this account</h2>
+    <p>
+      A replacement was started with a recovery code. If that was not you,
+      cancel it now — your passkeys still work until it completes.
+    </p>
+    <p><a href="/recover/status">See the request and cancel it</a></p>
+  </div>
+<% } %>
+
 <p>
   Signed in as <strong><%= user.username %></strong><% if (user.display_name && user.display_name !== user.username) { %>
   (<%= user.display_name %>)<% } %>.
@@ -110,6 +127,8 @@
     <% }); %>
   </ul>
 <% } %>
+
+<p><a href="/activity">See everything that has happened to this account</a></p>
 
 <h2>Recovery codes</h2>
 

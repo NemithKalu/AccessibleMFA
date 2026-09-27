@@ -1,0 +1,91 @@
+<%- include('partials/header', { title: title }) %>
+
+<%# Focus starts on the heading when there is a failure to explain. %>
+<h1 tabindex="-1" <%= error ? 'data-autofocus' : '' %>>Lost your device</h1>
+
+<% if (error) { %>
+  <p class="status" data-tone="error"><%= error %></p>
+<% } %>
+
+<p>
+  If every device that holds one of your passkeys is lost, broken or stolen,
+  you can replace them using a recovery code.
+</p>
+
+<h2>What happens after you enter a code</h2>
+<%#
+  Set out in full, before the user commits to anything. A 24 hour wait is a
+  surprise worth avoiding, and someone who is locked out needs to know now
+  whether this route will get them back in time.
+%>
+<ol>
+  <li>The code is used up. Each one works only once.</li>
+  <li>
+    You are signed in, but <strong>restricted</strong>: you can look at your
+    account, and nothing else. You cannot add passkeys, change recovery codes
+    or turn devices off.
+  </li>
+  <li>
+    A <strong>24 hour wait</strong> begins, and we tell you on your other
+    contact channels that this is happening.
+  </li>
+  <li>
+    During the wait, anyone who can sign in normally can cancel it — so if it
+    was not you, the real owner can stop it.
+  </li>
+  <li>
+    After the wait, you register a new passkey, and every old passkey on the
+    account is turned off.
+  </li>
+</ol>
+
+<h2>Enter your recovery code</h2>
+
+<form method="post" action="/recover">
+  <div class="field">
+    <label for="username">Username</label>
+    <input
+      type="text"
+      id="username"
+      name="username"
+      value="<%= username %>"
+      autocapitalize="none"
+      spellcheck="false"
+      required
+    />
+  </div>
+
+  <div class="field">
+    <label for="code">Recovery code</label>
+    <p class="hint" id="code-hint">
+      Ten characters, for example ABCDE-FGHJK. Dashes, spaces and lower case
+      are all fine.
+    </p>
+    <%#
+      autocomplete="off" and no type="password": a recovery code being typed
+      by someone using a screen reader needs to be readable back to them, and
+      masking it only makes a hard task harder. It is not a reusable secret.
+    %>
+    <input
+      type="text"
+      id="code"
+      name="code"
+      aria-describedby="code-hint"
+      autocomplete="off"
+      autocapitalize="characters"
+      spellcheck="false"
+      required
+    />
+  </div>
+
+  <p><button type="submit">Start replacing my passkeys</button></p>
+</form>
+
+<p>
+  Out of recovery codes? You will need to contact support and prove who you
+  are another way. There is no route through this page without one.
+</p>
+
+<p><a href="/signin">Back to signing in</a></p>
+
+<%- include('partials/footer', { script: '/js/recover.js' }) %>

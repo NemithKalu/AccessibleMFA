@@ -12,6 +12,8 @@ import { ORIGIN, RP_ID, RP_NAME } from '../config.js';
 import { consumeChallenge, issueChallenge } from '../challenge.js';
 import { AuthError } from '../errors.js';
 import * as db from '../db.js';
+import * as recovery from '../recovery.js';
+import { startSession } from '../session.js';
 import { cleanLabel } from '../text.js';
 
 const router = Router();
@@ -28,26 +30,6 @@ function normaliseUsername(raw) {
   return username;
 }
 
-/**
- * Sign the user in. Called only after an assertion has been fully verified.
- */
-function startSession(req, user, credentialId) {
-  return new Promise((resolve, reject) => {
-    // Regenerate to defeat session fixation: an attacker who planted a session
-    // ID in this browser before sign-in must not end up holding a signed-in one.
-    req.session.regenerate((err) => {
-      if (err) return reject(err);
-      // Set inside the callback — regenerate() replaces the session object, so
-      // anything written before this point is gone.
-      req.session.userId = user.id;
-      req.session.level = 'full'; // established by a passkey with user verification
-      // Remembered so that revoking this passkey can end this session too.
-      req.session.credentialId = credentialId;
-      req.session.save((saveErr) => (saveErr ? reject(saveErr) : resolve()));
-    });
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
@@ -57,12 +39,6 @@ router.post('/register/options', async (req, res) => {
   // account. Adding a passkey changes the credentials on an account, so it
   // needs a full session, never a restricted fallback one.
   const addingToExistingAccount = Boolean(req.session.userId);
-  if (addingToExistingAccount && req.session.level !== 'full') {
-    throw new AuthError(
-      'Adding a passkey needs a full sign-in with an existing passkey.',
-      403,
-    );
-  }
 
   let user = null;
   let pending = null;
@@ -70,6 +46,12 @@ router.post('/register/options', async (req, res) => {
   if (addingToExistingAccount) {
     user = db.findUserById(req.session.userId);
     if (!user) throw new AuthError('Your session is no longer valid. Please sign in again.', 401);
+
+    // A restricted session normally cannot touch credentials at all. The one
+    // exception is a recovery request that has served its waiting period —
+    // that is the whole point of the recovery journey. assertMayReplacePasskey
+    // throws with the specific reason if this is not that case.
+    if (req.session.level !== 'full') recovery.assertMayReplacePasskey(user);
   } else {
     const username = normaliseUsername(req.body.username);
     if (db.findUserByUsername(username)) {
@@ -171,6 +153,13 @@ router.post('/register/verify', async (req, res) => {
     user = db.createUser({ username, displayName, userHandle });
   }
 
+  // Re-checked here, not just when the options were handed out: the request
+  // may have been cancelled in between, and cancellation has to win.
+  const replacing =
+    req.session.userId && req.session.level !== 'full'
+      ? recovery.assertMayReplacePasskey(user)
+      : null;
+
   db.addCredential({
     id: credential.id,
     userId: user.id,
@@ -184,12 +173,22 @@ router.post('/register/verify', async (req, res) => {
 
   // Registering a passkey proves the same things signing in does, so the new
   // account is signed in straight away rather than making the user repeat it.
-  if (!req.session.userId) await startSession(req, user, credential.id);
+  if (!req.session.userId) {
+    await startSession(req, { user, level: 'full', credentialId: credential.id });
+  }
+
+  if (replacing) {
+    recovery.completeReplacement({ user, request: replacing, newCredentialId: credential.id });
+    // The user holds a working passkey again, so the restricted session is
+    // replaced by a full one. Their old devices' sessions die with the
+    // credentials that were just revoked.
+    await startSession(req, { user, level: 'full', credentialId: credential.id });
+  }
 
   res.json({
     verified: true,
     username: user.username,
-    next: '/account',
+    next: replacing ? '/account?from=recovered' : '/account',
   });
 });
 
@@ -314,7 +313,7 @@ router.post('/auth/verify', async (req, res) => {
   });
 
   const user = db.findUserById(stored.userId);
-  await startSession(req, user, stored.id);
+  await startSession(req, { user, level: 'full', credentialId: stored.id });
 
   res.json({ verified: true, username: user.username, next: '/account' });
 });

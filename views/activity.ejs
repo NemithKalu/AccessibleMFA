@@ -1,0 +1,28 @@
+<%- include('partials/header', { title: title }) %>
+
+<h1>Account activity</h1>
+
+<p>
+  Everything security-related that has happened to this account. Recovery
+  codes, passkeys and session details are never recorded here — only what was
+  done, and when.
+</p>
+
+<% if (entries.length === 0) { %>
+  <p>Nothing has been recorded on this account yet.</p>
+<% } else { %>
+  <%# A list, not a table: one event per row with a date and a sentence reads
+      far better than a two-column table under a screen reader. %>
+  <ul class="activity">
+    <% entries.forEach(function (entry) { %>
+      <li>
+        <p class="when"><%= new Date(entry.created_at).toLocaleString('en-GB') %></p>
+        <p><%= entry.detail %></p>
+      </li>
+    <% }); %>
+  </ul>
+<% } %>
+
+<p><a href="/account">Back to your account</a></p>
+
+<%- include('partials/footer') %>
