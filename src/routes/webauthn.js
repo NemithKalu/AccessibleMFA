@@ -12,6 +12,7 @@ import { ORIGIN, RP_ID, RP_NAME } from '../config.js';
 import { consumeChallenge, issueChallenge } from '../challenge.js';
 import { AuthError } from '../errors.js';
 import * as db from '../db.js';
+import { cleanLabel } from '../text.js';
 
 const router = Router();
 
@@ -27,15 +28,10 @@ function normaliseUsername(raw) {
   return username;
 }
 
-function cleanLabel(raw, fallback) {
-  const label = String(raw ?? '').trim().slice(0, 64);
-  return label || fallback;
-}
-
 /**
  * Sign the user in. Called only after an assertion has been fully verified.
  */
-function startSession(req, user) {
+function startSession(req, user, credentialId) {
   return new Promise((resolve, reject) => {
     // Regenerate to defeat session fixation: an attacker who planted a session
     // ID in this browser before sign-in must not end up holding a signed-in one.
@@ -45,6 +41,8 @@ function startSession(req, user) {
       // anything written before this point is gone.
       req.session.userId = user.id;
       req.session.level = 'full'; // established by a passkey with user verification
+      // Remembered so that revoking this passkey can end this session too.
+      req.session.credentialId = credentialId;
       req.session.save((saveErr) => (saveErr ? reject(saveErr) : resolve()));
     });
   });
@@ -89,7 +87,9 @@ router.post('/register/options', async (req, res) => {
   }
 
   const userHandle = user ? user.user_handle : pending.userHandle;
-  const existingCredentials = user ? db.listCredentials(user.id) : [];
+  // Active ones only. A revoked passkey must not block the user from
+  // enrolling that same device again after they get it back.
+  const existingCredentials = user ? db.listActiveCredentials(user.id) : [];
 
   const challenge = issueChallenge(req, 'register', {
     userId: user?.id ?? null,
@@ -184,7 +184,7 @@ router.post('/register/verify', async (req, res) => {
 
   // Registering a passkey proves the same things signing in does, so the new
   // account is signed in straight away rather than making the user repeat it.
-  if (!req.session.userId) await startSession(req, user);
+  if (!req.session.userId) await startSession(req, user, credential.id);
 
   res.json({
     verified: true,
@@ -216,10 +216,10 @@ router.post('/auth/options', async (req, res) => {
       );
     }
 
-    const credentials = db.listCredentials(user.id);
+    const credentials = db.listActiveCredentials(user.id);
     if (credentials.length === 0) {
       throw new AuthError(
-        'That account has no passkeys registered, so it cannot be signed in to yet.',
+        'That account has no passkeys that can be used, so it cannot be signed in to. Use a recovery code instead.',
       );
     }
 
@@ -252,6 +252,15 @@ router.post('/auth/verify', async (req, res) => {
   if (!stored) {
     throw new AuthError(
       'That passkey is not registered with this site. Try another passkey, or create an account.',
+    );
+  }
+
+  // A revoked passkey is refused here as well as being left out of
+  // allowCredentials, because allowCredentials is only a hint to the browser —
+  // a lost device can still present its credential without being asked.
+  if (stored.status !== 'active') {
+    throw new AuthError(
+      'That passkey was turned off for this account and can no longer be used to sign in.',
     );
   }
 
@@ -305,7 +314,7 @@ router.post('/auth/verify', async (req, res) => {
   });
 
   const user = db.findUserById(stored.userId);
-  await startSession(req, user);
+  await startSession(req, user, stored.id);
 
   res.json({ verified: true, username: user.username, next: '/account' });
 });

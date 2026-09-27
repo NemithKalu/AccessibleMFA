@@ -14,8 +14,8 @@ process.env.PORT = '3998';
 process.env.SESSION_SECRET = 'test-secret';
 
 const { default: app } = await import('../src/app.js');
-const { ORIGIN, RP_ID } = await import('../src/config.js');
-const { SoftwareAuthenticator } = await import('./authenticator.js');
+const { ORIGIN } = await import('../src/config.js');
+const { registerAccount } = await import('./client.js');
 const codes = await import('../src/recovery-codes.js');
 
 let server;
@@ -30,48 +30,6 @@ after(() => {
   rmSync(workDir, { recursive: true, force: true });
 });
 
-/** A signed-in browser: cookie jar, forms and pages. */
-async function signedInClient(username) {
-  let cookie = null;
-  const client = {
-    async post(path, body, asForm = false) {
-      const response = await fetch(`${ORIGIN}${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': asForm ? 'application/x-www-form-urlencoded' : 'application/json',
-          ...(cookie ? { Cookie: cookie } : {}),
-        },
-        body: asForm ? new URLSearchParams(body ?? {}).toString() : JSON.stringify(body ?? {}),
-        redirect: 'manual',
-      });
-      const setCookie = response.headers.get('set-cookie');
-      if (setCookie) cookie = setCookie.split(';')[0];
-      const text = await response.text();
-      return { status: response.status, text };
-    },
-    async getPage(path) {
-      const response = await fetch(`${ORIGIN}${path}`, {
-        headers: cookie ? { Cookie: cookie } : {},
-        redirect: 'manual',
-      });
-      return { status: response.status, text: await response.text() };
-    },
-  };
-
-  const authenticator = new SoftwareAuthenticator();
-  const options = await client.post('/webauthn/register/options', {
-    username,
-    deviceName: 'Test authenticator',
-  });
-  const attestation = authenticator.register({
-    rpId: RP_ID,
-    origin: ORIGIN,
-    challenge: JSON.parse(options.text).challenge,
-  });
-  await client.post('/webauthn/register/verify', attestation);
-  return client;
-}
-
 /** Pull the plaintext codes out of the one page that ever shows them. */
 function extractCodes(html) {
   return [...html.matchAll(/<code>([A-Z0-9-]+)<\/code>/g)].map((match) => match[1]);
@@ -79,9 +37,9 @@ function extractCodes(html) {
 
 describe('generating recovery codes', () => {
   it('creates ten codes and shows them exactly once', async () => {
-    const client = await signedInClient('rc-alice');
+    const { client } = await registerAccount('rc-alice');
 
-    const created = await client.post('/recovery-codes', {}, true);
+    const created = await client.postForm('/recovery-codes', {});
     assert.equal(created.status, 200);
     const plaintext = extractCodes(created.text);
     assert.equal(plaintext.length, 10);
@@ -101,10 +59,10 @@ describe('generating recovery codes', () => {
   });
 
   it('replaces the old set, so an old code cannot be used later', async () => {
-    const client = await signedInClient('rc-bob');
+    const { client } = await registerAccount('rc-bob');
 
-    const first = extractCodes((await client.post('/recovery-codes', {}, true)).text);
-    const second = extractCodes((await client.post('/recovery-codes', {}, true)).text);
+    const first = extractCodes((await client.postForm('/recovery-codes', {})).text);
+    const second = extractCodes((await client.postForm('/recovery-codes', {})).text);
 
     assert.equal(second.length, 10);
     for (const code of first) assert.ok(!second.includes(code));

@@ -1,7 +1,7 @@
 // Route guards.
 
 import { AuthError } from './errors.js';
-import { findUserById } from './db.js';
+import { findCredentialById, findUserById } from './db.js';
 
 /** Any signed-in user, including (later) a restricted fallback session. */
 export function requireSession(req, res, next) {
@@ -11,6 +11,17 @@ export function requireSession(req, res, next) {
     // Account vanished underneath the session (e.g. database reset).
     return req.session.destroy(() => res.redirect('/signin'));
   }
+  // Revocation hook: if the passkey this session was created with has since
+  // been turned off, the session dies with it. That is what makes "revoke the
+  // device I lost" actually throw the thief out, rather than only stopping
+  // the next sign-in.
+  if (req.session.credentialId) {
+    const credential = findCredentialById(req.session.credentialId);
+    if (!credential || credential.status !== 'active') {
+      return req.session.destroy(() => res.redirect('/signin?from=revoked'));
+    }
+  }
+
   res.locals.user = user;
   next();
 }

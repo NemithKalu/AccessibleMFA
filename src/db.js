@@ -40,6 +40,9 @@ db.exec(`
     counter          INTEGER NOT NULL,
     transports       TEXT NOT NULL,
     device_name      TEXT NOT NULL,
+    -- 'active' or 'revoked'. Revoked rows are kept, not deleted, so the
+    -- device list can still show that a lost device was turned off and when.
+    status           TEXT NOT NULL DEFAULT 'active',
     backed_up        INTEGER NOT NULL,
     backup_eligible  INTEGER NOT NULL,
     created_at       TEXT NOT NULL,
@@ -70,6 +73,20 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 `);
+
+/**
+ * Add a column to an existing database. CREATE TABLE IF NOT EXISTS does
+ * nothing to a table that is already there, so a teammate who ran an earlier
+ * version would otherwise have to delete their database file.
+ */
+function addColumnIfMissing(table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+addColumnIfMissing('credentials', 'status', "TEXT NOT NULL DEFAULT 'active'");
 
 const now = () => new Date().toISOString();
 
@@ -105,6 +122,11 @@ export function listCredentials(userId) {
     .prepare('SELECT * FROM credentials WHERE user_id = ? ORDER BY created_at')
     .all(userId)
     .map(toCredential);
+}
+
+/** Only the passkeys that can still be used to sign in. */
+export function listActiveCredentials(userId) {
+  return listCredentials(userId).filter((credential) => credential.status === 'active');
 }
 
 export function findCredentialById(id) {
@@ -201,6 +223,25 @@ export function listAuditEntries(userId) {
     .all(userId);
 }
 
+/** Both take user_id in the WHERE clause so one user cannot touch another's
+ *  device by guessing a credential ID. */
+export function renameCredential({ id, userId, deviceName }) {
+  const info = db
+    .prepare('UPDATE credentials SET device_name = ? WHERE id = ? AND user_id = ?')
+    .run(deviceName, id, userId);
+  return info.changes === 1;
+}
+
+export function revokeCredential({ id, userId }) {
+  const info = db
+    .prepare(
+      `UPDATE credentials SET status = 'revoked'
+       WHERE id = ? AND user_id = ? AND status = 'active'`,
+    )
+    .run(id, userId);
+  return info.changes === 1;
+}
+
 function toCredential(row) {
   return {
     id: row.id,
@@ -211,6 +252,7 @@ function toCredential(row) {
     counter: row.counter,
     transports: JSON.parse(row.transports),
     deviceName: row.device_name,
+    status: row.status,
     backedUp: row.backed_up === 1,
     backupEligible: row.backup_eligible === 1,
     createdAt: row.created_at,

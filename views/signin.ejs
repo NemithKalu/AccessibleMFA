@@ -1,6 +1,12 @@
 <%- include('partials/header', { title: title }) %>
 
-<h1>Sign in</h1>
+<%# tabindex="-1" so focus can start on the heading when we arrived here
+    because something happened, rather than because the user chose to. %>
+<h1 tabindex="-1" <%= arrivalMessage ? 'data-autofocus' : '' %>>Sign in</h1>
+
+<% if (arrivalMessage) { %>
+  <p class="status" data-tone="info"><%= arrivalMessage %></p>
+<% } %>
 
 <p>Sign in with the passkey you created. There is no password to type.</p>
 

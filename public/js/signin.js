@@ -9,6 +9,11 @@
   var passkeyButton = document.getElementById('passkey-button');
   var usernameInput = document.getElementById('username');
 
+  // Arrived here because something happened (a passkey was revoked, say)
+  // rather than by choice: start the screen reader on the explanation.
+  var heading = document.querySelector('h1[data-autofocus]');
+  if (heading) heading.focus();
+
   if (!form) return;
 
   if (!app.supported()) {

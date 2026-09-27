@@ -23,10 +23,28 @@
     again.
   </p>
 <% } else { %>
+
+<%# Only worth saying once something has been turned off. %>
+<% if (activeCount < credentials.length) { %>
+  <p>
+    <strong><%= activeCount %></strong> of your <%= credentials.length %>
+    passkeys can still be used to sign in.
+  </p>
+<% } %>
+
   <ul class="devices">
     <% credentials.forEach(function (credential, index) { %>
       <li>
-        <h3><%= credential.deviceName %></h3>
+        <h3>
+          <%= credential.deviceName %>
+          <%# Status in words, never colour alone — a low-vision or colour
+              blind user has to be able to tell these apart too. %>
+          <% if (credential.status !== 'active') { %>
+            <span class="tag">Turned off</span>
+          <% } else if (credential.id === currentCredentialId) { %>
+            <span class="tag">This device, signed in now</span>
+          <% } %>
+        </h3>
         <dl>
           <dt>Added</dt>
           <dd><%= new Date(credential.createdAt).toLocaleString('en-GB') %></dd>
@@ -55,6 +73,39 @@
             <% } %>
           </dd>
         </dl>
+
+        <%# Renaming and revoking change the registered devices, so a
+            restricted fallback session is shown the list but not the
+            controls. %>
+        <% if (sessionLevel === 'full' && credential.status === 'active') { %>
+          <div class="device-actions">
+            <form method="post" action="/devices/<%= encodeURIComponent(credential.id) %>/rename">
+              <div class="field">
+                <%# A unique id per row: a <label for> that points at the wrong
+                    input is worse than no label at all. %>
+                <label for="rename-<%= index %>">New name for this passkey</label>
+                <input
+                  type="text"
+                  id="rename-<%= index %>"
+                  name="deviceName"
+                  value="<%= credential.deviceName %>"
+                />
+              </div>
+              <button class="secondary" type="submit">
+                Save the name for “<%= credential.deviceName %>”
+              </button>
+            </form>
+
+            <form method="post" action="/devices/<%= encodeURIComponent(credential.id) %>/revoke">
+              <%# The device name is in the button text, not just nearby, so
+                  that a screen reader user tabbing through the buttons hears
+                  which passkey each one turns off. %>
+              <button class="danger" type="submit">
+                Turn off “<%= credential.deviceName %>”
+              </button>
+            </form>
+          </div>
+        <% } %>
       </li>
     <% }); %>
   </ul>

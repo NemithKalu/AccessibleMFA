@@ -161,3 +161,18 @@ ol.codes code {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   letter-spacing: 0.08em;
 }
+
+.tag {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--muted);
+  border-radius: 0.2rem;
+  color: var(--muted);
+  vertical-align: middle;
+}
+.device-actions { margin-top: 0.9rem; }
+.device-actions .field { margin-bottom: 0.6rem; }
+.device-actions form { display: inline-block; margin: 0 0.4rem 0.4rem 0; vertical-align: top; }
+button.danger { background: #a32020; }
