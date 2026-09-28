@@ -35,11 +35,25 @@
   <%# Points at /recover until the "Other ways to sign in" page exists
       (plan step 4); this is the only other route that works today. %>
   <a class="button-link" id="other-method-link" href="/recover">Use another method</a>
-  <%# Hidden until plan step 3 adds voice guidance and un-hides it with
-      script; a visible control that does nothing yet would trap a
-      screen-reader user who activates it expecting something to happen. %>
+  <%# Hidden in the markup because speaking guidance needs script; the
+      voice-guidance wiring in signin.js un-hides this once it has run. A
+      visible control that does nothing yet would trap a screen-reader user
+      who activates it expecting something to happen. %>
   <button type="button" id="read-guidance" hidden>Read guidance</button>
+  <%# Hidden until guidance is switched on; signin.js reveals it alongside
+      the note below, and hides it again (but not the note — see below) when
+      guidance is turned off. %>
+  <button type="button" id="stop-guidance" class="secondary" hidden>Stop guidance</button>
 </div>
+
+<%# Written version of the spoken introduction (AR-05), and voice guidance's
+    own small polite live region (signin.js sets its text) — kept separate
+    from #status above so guidance feedback never overwrites a sign-in
+    message still on screen. %>
+<p id="guidance-note" class="hint" role="status" aria-live="polite" hidden>
+  Voice guidance is on: each step of signing in is also read aloud. Use your
+  passkey to sign in. Your device will ask you to verify.
+</p>
 
 <h2>Sign in with your username instead</h2>
 <form id="signin-form" novalidate>
@@ -64,4 +78,4 @@
 
 <p>No account yet? <a href="/register">Create an account</a>.</p>
 
-<%- include('partials/footer', { scripts: ['/js/signin-messages.js', '/js/signin.js'] }) %>
+<%- include('partials/footer', { scripts: ['/js/signin-messages.js', '/js/voice-guidance.js', '/js/signin.js'] }) %>

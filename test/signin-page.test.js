@@ -52,7 +52,7 @@ describe('the sign-in page, as an anonymous visitor', () => {
     assert.match(html, new RegExp(`Sign in to the ${RP_NAME} with your passkey`));
   });
 
-  it('reads in the planned order: notice, status, passkey, other method, guidance, username', async () => {
+  it('reads in the planned order: notice, status, passkey, other method, guidance, stop guidance, username', async () => {
     const html = await getSignInPage();
 
     const notice = html.indexOf('What happens when you sign in');
@@ -60,6 +60,7 @@ describe('the sign-in page, as an anonymous visitor', () => {
     const passkey = html.indexOf('Sign in with a passkey');
     const otherMethod = html.indexOf('Use another method');
     const guidance = html.indexOf('Read guidance');
+    const stopGuidance = html.indexOf('Stop guidance');
     const username = html.indexOf('Sign in with your username instead');
 
     for (const [name, index] of [
@@ -68,6 +69,7 @@ describe('the sign-in page, as an anonymous visitor', () => {
       ['passkey button', passkey],
       ['other method link', otherMethod],
       ['read guidance button', guidance],
+      ['stop guidance button', stopGuidance],
       ['username heading', username],
     ]) {
       assert.notEqual(index, -1, `expected to find the ${name}`);
@@ -77,7 +79,8 @@ describe('the sign-in page, as an anonymous visitor', () => {
     assert.ok(status < passkey, 'the status region should come right before the controls');
     assert.ok(passkey < otherMethod, '"Sign in with a passkey" should come before "Use another method"');
     assert.ok(otherMethod < guidance, '"Use another method" should come before "Read guidance"');
-    assert.ok(guidance < username, 'the three controls should come before the username heading');
+    assert.ok(guidance < stopGuidance, '"Read guidance" should come before "Stop guidance"');
+    assert.ok(stopGuidance < username, 'the controls should come before the username heading');
   });
 
   it('has a status region that is a polite live region', async () => {
@@ -87,10 +90,39 @@ describe('the sign-in page, as an anonymous visitor', () => {
     assert.ok(statusTag.includes('aria-live="polite"'), 'expected aria-live="polite"');
   });
 
-  it('keeps "Read guidance" hidden, since voice guidance is not built yet', async () => {
+  it('keeps both voice-guidance buttons hidden until script un-hides them', async () => {
     const html = await getSignInPage();
-    const button = html.match(/<button[^>]*id="read-guidance"[^>]*>/)?.[0] ?? '';
-    assert.ok(button.includes('hidden'), 'expected the button to carry the hidden attribute');
+    const readButton = html.match(/<button[^>]*id="read-guidance"[^>]*>/)?.[0] ?? '';
+    assert.ok(readButton.includes('hidden'), 'expected "Read guidance" to carry the hidden attribute');
+    const stopButton = html.match(/<button[^>]*id="stop-guidance"[^>]*>/)?.[0] ?? '';
+    assert.ok(stopButton.includes('hidden'), 'expected "Stop guidance" to carry the hidden attribute');
+  });
+
+  it('has a written, hidden-by-default guidance note that is its own polite live region (AR-05)', async () => {
+    const html = await getSignInPage();
+    const note = html.match(/<p[^>]*id="guidance-note"[^>]*>/)?.[0] ?? '';
+    assert.ok(note, 'expected a guidance note element');
+    assert.ok(note.includes('hidden'), 'expected the note to carry the hidden attribute');
+    assert.ok(note.includes('role="status"'), 'expected role="status" on the guidance note');
+    assert.ok(note.includes('aria-live="polite"'), 'expected aria-live="polite" on the guidance note');
+  });
+
+  it('loads the sign-in scripts in order: messages, then voice guidance, then the page script', async () => {
+    const html = await getSignInPage();
+    const messages = html.indexOf('/js/signin-messages.js');
+    const voiceGuidance = html.indexOf('/js/voice-guidance.js');
+    const signin = html.indexOf('/js/signin.js');
+
+    for (const [name, index] of [
+      ['signin-messages.js', messages],
+      ['voice-guidance.js', voiceGuidance],
+      ['signin.js', signin],
+    ]) {
+      assert.notEqual(index, -1, `expected to find a script tag for ${name}`);
+    }
+
+    assert.ok(messages < voiceGuidance, 'signin-messages.js should load before voice-guidance.js');
+    assert.ok(voiceGuidance < signin, 'voice-guidance.js should load before signin.js');
   });
 
   it('labels the username input', async () => {
