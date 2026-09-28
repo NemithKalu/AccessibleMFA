@@ -111,6 +111,15 @@ button {
 }
 button.secondary { background: var(--paper); color: var(--accent); }
 button[disabled] { opacity: 0.6; cursor: progress; }
+/* aria-disabled (used on the sign-in page instead of the disabled attribute,
+   so the button stays focusable). It switches to the outlined look so a
+   low-vision user can see it will not respond, rather than dimming it —
+   dimming would drop its text contrast below 4.5:1. */
+button[aria-disabled="true"] {
+  background: var(--paper);
+  color: var(--accent);
+  cursor: not-allowed;
+}
 
 .field { margin-bottom: 1.25rem; }
 

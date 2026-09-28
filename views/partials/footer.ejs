@@ -4,12 +4,23 @@
       <p>Accessible MFA — CS3053 prototype (Secure Sons). Demonstration only.</p>
     </footer>
 
-    <% if (typeof script !== 'undefined' && script) { %>
+    <%
+      // Pages pass either `script` (a single path, most pages) or `scripts`
+      // (an array, for a page that needs more than one of its own files —
+      // e.g. the sign-in page's message catalogue plus its page script).
+      // Both load after webauthn-client.js, in order, all deferred.
+      var extraScripts = typeof scripts !== 'undefined' && scripts
+        ? scripts
+        : (typeof script !== 'undefined' && script ? [script] : []);
+    %>
+    <% if (extraScripts.length) { %>
       <!-- @simplewebauthn/browser, served from node_modules as a UMD bundle.
            It exposes window.SimpleWebAuthnBrowser. No build step involved. -->
       <script src="/vendor/index.umd.min.js" defer></script>
       <script src="/js/webauthn-client.js" defer></script>
-      <script src="<%= script %>" defer></script>
+      <% extraScripts.forEach(function (src) { %>
+        <script src="<%= src %>" defer></script>
+      <% }) %>
     <% } %>
   </body>
 </html>

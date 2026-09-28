@@ -37,17 +37,54 @@
     }
   }
 
+  /**
+   * Like setBusy, but for the sign-in page's buttons, which must not use the
+   * `disabled` attribute: disabling a focused button makes the browser drop
+   * focus to the page, losing the screen reader's place. `aria-disabled`
+   * keeps the button focusable and in the tab order while still signalling
+   * (and, via CSS, showing) that it will not respond to another click. The
+   * label is also left untouched — changing it would fire a second,
+   * unrelated announcement on top of the status message.
+   */
+  function markBusy(button, busy) {
+    if (!button) return;
+    if (busy) {
+      button.setAttribute('aria-disabled', 'true');
+    } else {
+      button.removeAttribute('aria-disabled');
+    }
+  }
+
+  /**
+   * POST JSON and let the caller tell *why* it failed:
+   *   - kind 'network': fetch itself rejected (offline, server not running).
+   *   - kind 'server': the server answered, but with a non-2xx status. The
+   *     AuthError's optional `code` (see src/errors.js) travels along on
+   *     `error.code`, so callers can act on it without parsing the message.
+   */
   async function postJSON(url, body) {
-    var response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {}),
-    });
+    var response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}),
+      });
+    } catch (fetchError) {
+      var networkError = new Error('The website could not be reached.');
+      networkError.kind = 'network';
+      throw networkError;
+    }
+
     var payload = await response.json().catch(function () {
       return {};
     });
     if (!response.ok) {
-      throw new Error(payload.error || 'The server could not complete that request.');
+      var serverError = new Error(payload.error || 'The server could not complete that request.');
+      serverError.kind = 'server';
+      serverError.status = response.status;
+      serverError.code = payload.code;
+      throw serverError;
     }
     return payload;
   }
@@ -75,6 +112,12 @@
       case 'SecurityError':
         return 'This page is not being served from an address that passkeys can be used on.';
       default:
+        // A postJSON network failure surfaces here too (register.js and
+        // account.js pass any caught error straight to this function), so it
+        // gets a plain-language message instead of the raw "Failed to fetch".
+        if (error && error.kind === 'network') {
+          return 'The website could not be reached. Check your connection and try again. Nothing has changed.';
+        }
         return (error && error.message) || 'The passkey request could not be completed.';
     }
   }
@@ -95,6 +138,7 @@
   window.AccessibleMFA = {
     announce: announce,
     setBusy: setBusy,
+    markBusy: markBusy,
     postJSON: postJSON,
     describeWebAuthnError: describeWebAuthnError,
     supported: supported,

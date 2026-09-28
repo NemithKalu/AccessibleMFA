@@ -221,7 +221,9 @@ describe('authentication', () => {
     });
 
     assert.equal(verified.status, 400);
-    assert.match(verified.body.error, /does not match the account/);
+    assert.equal(verified.body.code, 'account-mismatch');
+    assert.match(verified.body.error, /^Sign-in was not completed\./);
+    assert.match(verified.body.error, /belongs to a different account/);
   });
 
   it('rejects an assertion without the user-verification flag', async () => {
@@ -231,7 +233,9 @@ describe('authentication', () => {
     const { verified } = await signIn('erin', authenticator, { userVerified: false });
 
     assert.equal(verified.status, 400);
-    assert.match(verified.body.error, /did not confirm it was you|User verification/i);
+    assert.equal(verified.body.code, 'not-verified');
+    assert.match(verified.body.error, /^Sign-in was not completed\./);
+    assert.match(verified.body.error, /did not confirm it was you/);
   });
 
   it('names the reason when the username does not exist', async () => {
@@ -239,7 +243,9 @@ describe('authentication', () => {
       username: 'nobody',
     });
     assert.equal(options.status, 400);
-    assert.match(options.body.error, /no account with the username/);
+    assert.equal(options.body.code, 'no-account');
+    assert.match(options.body.error, /^Sign-in was not completed\./);
+    assert.match(options.body.error, /no account called/);
   });
 });
 
@@ -263,6 +269,8 @@ describe('challenges are single use', () => {
     // the first verification ran, so there is nothing left to match.
     const replay = await client.post('/webauthn/auth/verify', assertion);
     assert.equal(replay.status, 400);
+    assert.equal(replay.body.code, 'request-expired');
+    assert.match(replay.body.error, /^Sign-in was not completed\./);
     assert.match(replay.body.error, /expired or was already used/);
   });
 
@@ -305,7 +313,9 @@ describe('the signature counter', () => {
 
     const clone = await signIn('ivan', authenticator, { counter: 1 });
     assert.equal(clone.verified.status, 400);
-    assert.match(clone.verified.body.error, /out-of-date use count/);
+    assert.equal(clone.verified.body.code, 'possible-copy');
+    assert.match(clone.verified.body.error, /^Sign-in was not completed\./);
+    assert.match(clone.verified.body.error, /may have been copied/);
   });
 
   it('keeps working with a synced passkey that always reports zero', async () => {

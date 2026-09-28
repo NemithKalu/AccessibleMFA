@@ -80,11 +80,14 @@ app.use((err, req, res, _next) => {
   const message = isAuthError
     ? err.message
     : 'Something went wrong on our side. Please try again.';
+  const code = isAuthError ? err.code : undefined;
 
   if (req.accepts('html') && !req.is('application/json')) {
     return res.status(status).render('error', { title: 'Something went wrong', message });
   }
-  res.status(status).json({ error: message });
+  // code is only present for the newer, machine-readable failures (currently
+  // the sign-in path); older callers keep getting just { error }.
+  res.status(status).json(code ? { error: message, code } : { error: message });
 });
 
 export default app;

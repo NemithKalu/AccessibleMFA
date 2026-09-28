@@ -15,9 +15,20 @@ export const RP_ID = 'localhost';
 // scheme or port, so we verify the origin separately.
 export const ORIGIN = `http://${RP_ID}:${PORT}`;
 
-// How long a challenge stays valid. Short, because a challenge is only needed
-// for the few seconds between asking the browser and the user confirming.
-export const CHALLENGE_TTL_MS = 2 * 60 * 1000;
+// How long the device's passkey prompt stays open for.
+//
+// @simplewebauthn/server's own default is 60 seconds, which is not enough time
+// for someone navigating the operating system's prompt with a screen reader.
+// The page itself cannot warn as the limit approaches — the OS prompt has
+// exclusive focus while it is open — so the limit has to be generous up front
+// instead (WCAG 2.2.1; plan decision 5).
+export const PASSKEY_PROMPT_TIMEOUT_MS = 5 * 60 * 1000;
+
+// How long a challenge stays valid. It must outlast the device prompt above —
+// otherwise the challenge could expire while the user is still mid-prompt —
+// so it is the prompt timeout plus a minute of slack. It is still single use:
+// this only bounds how long an *unused* challenge is allowed to sit around.
+export const CHALLENGE_TTL_MS = PASSKEY_PROMPT_TIMEOUT_MS + 60 * 1000;
 
 // Dev-only default. A real deployment would require this to be set.
 export const SESSION_SECRET = process.env.SESSION_SECRET ?? 'dev-only-insecure-session-secret';
