@@ -8,9 +8,10 @@
   <p class="status" data-tone="info"><%= arrivalMessage %></p>
 <% } %>
 
-<p>Sign in with the passkey you created. There is no password to type.</p>
-
-<%- include('partials/status') %>
+<p>
+  Sign in to the <%= siteName %> with your passkey. There is no password to
+  type.
+</p>
 
 <!--
   Accessibility rule: say what is about to happen, in text, before the
@@ -25,23 +26,27 @@
   </p>
 </div>
 
-<h2>Sign in without typing</h2>
-<p>
-  If your passkey is on this device, it can offer you the right account
-  directly.
-</p>
-<p>
+<h2>Choose how to sign in</h2>
+
+<%- include('partials/status') %>
+
+<div class="sign-in-actions">
   <button type="button" id="passkey-button">Sign in with a passkey</button>
-</p>
+  <%# Points at /recover until the "Other ways to sign in" page exists
+      (plan step 4); this is the only other route that works today. %>
+  <a class="button-link" id="other-method-link" href="/recover">Use another method</a>
+  <%# Hidden until plan step 3 adds voice guidance and un-hides it with
+      script; a visible control that does nothing yet would trap a
+      screen-reader user who activates it expecting something to happen. %>
+  <button type="button" id="read-guidance" hidden>Read guidance</button>
+</div>
 
-<p class="divider">— or —</p>
-
-<h2>Sign in with your username</h2>
+<h2>Sign in with your username instead</h2>
 <form id="signin-form" novalidate>
   <div class="field">
     <label for="username">Username</label>
     <p class="hint" id="username-hint">
-      Use this if your passkey is on another device or a security key.
+      Use this if your passkey is on a security key or another device.
     </p>
     <input
       type="text"
@@ -57,12 +62,6 @@
   <p><button type="submit" id="submit">Continue</button></p>
 </form>
 
-<h2>Lost every device?</h2>
-<p>
-  If you cannot use any of your passkeys, you can
-  <a href="/recover">replace them with a recovery code</a>. It takes 24 hours.
-</p>
-
-<p>No account yet? <a href="/register">Create one</a>.</p>
+<p>No account yet? <a href="/register">Create an account</a>.</p>
 
 <%- include('partials/footer', { script: '/js/signin.js' }) %>

@@ -57,6 +57,14 @@ header {
   border-bottom: 2px solid var(--line);
   padding: 0.75rem 1rem;
 }
+/* Bold and full-size, not muted: this is how a user (especially one arriving
+   via a screen reader or braille display) confirms which site is asking for
+   their passkey, so it must be as legible as the rest of the page. */
+.site-name {
+  font-weight: 700;
+  margin: 0 auto 0.5rem;
+  max-width: 44rem;
+}
 header nav ul {
   display: flex;
   flex-wrap: wrap;
@@ -119,10 +127,29 @@ button[disabled] { opacity: 0.6; cursor: progress; }
 .status[data-tone="success"] { border-left-color: #1d6b3a; background: #eaf5ee; }
 .status[data-tone="error"] { border-left-color: #a32020; background: #fbecec; }
 
-.divider {
-  margin: 2rem 0;
-  color: var(--muted);
-  text-transform: lowercase;
+/* The main sign-in controls. Wraps on narrow screens so nothing needs
+   horizontal scrolling down to 320px wide. */
+.sign-in-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+/* A link that must look like button.secondary because it navigates (to
+   "Use another method") rather than performing an in-page action — real
+   navigation belongs in an <a>, not a <button>, for correct browser and
+   screen-reader behaviour (back button, "open in new tab", link lists). */
+a.button-link {
+  display: inline-block;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--accent);
+  text-decoration: none;
 }
 
 .prompt-notice {
