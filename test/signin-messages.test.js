@@ -271,6 +271,111 @@ describe('sign-in failure codes', () => {
     assert.match(verified.body.error, /^Sign-in was not completed\./);
     assert.equal(SignInMessages.spokenLine(verified.body.code), verified.body.error);
   });
+
+  it('unknown-passkey, when the credential was never registered here', async () => {
+    const stranger = new SoftwareAuthenticator();
+    const client = createClient();
+    const options = await client.post('/webauthn/auth/options', {});
+    const assertion = stranger.authenticate({
+      rpId: RP_ID,
+      origin: ORIGIN,
+      challenge: options.body.challenge,
+    });
+    const verified = await client.post('/webauthn/auth/verify', assertion);
+
+    assert.equal(verified.status, 400);
+    assert.equal(verified.body.code, 'unknown-passkey');
+    assert.match(verified.body.error, /^Sign-in was not completed\./);
+    assert.equal(SignInMessages.spokenLine(verified.body.code), verified.body.error);
+  });
+
+  it('wrong-origin, when the assertion claims a different website made the request', async () => {
+    const authenticator = new SoftwareAuthenticator();
+    await registerAccount('msg-wrongorigin', { authenticator });
+
+    const client = createClient();
+    const options = await client.post('/webauthn/auth/options', { username: 'msg-wrongorigin' });
+    const assertion = authenticator.authenticate({
+      rpId: RP_ID,
+      origin: 'http://evil.example', // the signed client data names the wrong site
+      challenge: options.body.challenge,
+    });
+    const verified = await client.post('/webauthn/auth/verify', assertion);
+
+    assert.equal(verified.status, 400);
+    assert.equal(verified.body.code, 'wrong-origin');
+    assert.match(verified.body.error, /^Sign-in was not completed\./);
+    assert.equal(SignInMessages.spokenLine(verified.body.code), verified.body.error);
+  });
+
+  // @simplewebauthn/server checks the client data's origin before it checks
+  // the authenticator data's RP ID hash (see verifyAuthenticationResponse.js
+  // in node_modules), so with a correct origin and only the RP ID wrong, the
+  // library's own "Unexpected RP ID hash" error is what fires, and
+  // translateVerificationError's /RP ID/i test is what turns that into
+  // 'wrong-site' — this really is the server's real behaviour, not a guess.
+  it('wrong-site, when the authenticator signed for a different RP ID', async () => {
+    const authenticator = new SoftwareAuthenticator();
+    await registerAccount('msg-wrongsite', { authenticator });
+
+    const client = createClient();
+    const options = await client.post('/webauthn/auth/options', { username: 'msg-wrongsite' });
+    const assertion = authenticator.authenticate({
+      rpId: 'evil.example', // the authenticator data hashes the wrong RP ID
+      origin: ORIGIN,
+      challenge: options.body.challenge,
+    });
+    const verified = await client.post('/webauthn/auth/verify', assertion);
+
+    assert.equal(verified.status, 400);
+    assert.equal(verified.body.code, 'wrong-site');
+    assert.match(verified.body.error, /^Sign-in was not completed\./);
+    assert.equal(SignInMessages.spokenLine(verified.body.code), verified.body.error);
+  });
+
+  it('request-mismatch, when a registration challenge is presented to sign-in verify', async () => {
+    const client = createClient();
+    // Leaves a 'register' challenge on the session. Nothing in the body needs
+    // to be a usable assertion: consumeChallenge rejects the purpose mismatch
+    // before /auth/verify even looks at req.body.
+    await client.post('/webauthn/register/options', { username: 'msg-mismatch' });
+    const verified = await client.post('/webauthn/auth/verify', {});
+
+    assert.equal(verified.status, 400);
+    assert.equal(verified.body.code, 'request-mismatch');
+    assert.match(verified.body.error, /^Sign-in was not completed\./);
+    assert.equal(SignInMessages.spokenLine(verified.body.code), verified.body.error);
+  });
+
+  it('not-present, when the authenticator reports no touch or button press', async () => {
+    const authenticator = new SoftwareAuthenticator();
+    await registerAccount('msg-notpresent', { authenticator });
+
+    const client = createClient();
+    const options = await client.post('/webauthn/auth/options', { username: 'msg-notpresent' });
+    const assertion = authenticator.authenticate({
+      rpId: RP_ID,
+      origin: ORIGIN,
+      challenge: options.body.challenge,
+      // A real authenticator never reports verified-but-not-present; this is
+      // exactly the invalid combination needed to exercise the server's own
+      // not-present check on purpose (test/authenticator.js).
+      userPresent: false,
+    });
+    const verified = await client.post('/webauthn/auth/verify', assertion);
+
+    assert.equal(verified.status, 400);
+    assert.equal(verified.body.code, 'not-present');
+    assert.match(verified.body.error, /^Sign-in was not completed\./);
+    assert.equal(SignInMessages.spokenLine(verified.body.code), verified.body.error);
+  });
+
+  // not-verified-other is the library's catch-all for a verification failure
+  // that matches none of translateVerificationError's regexes. Every failure
+  // @simplewebauthn/server can actually raise here is already covered above
+  // (user verification, user presence, counter, challenge, origin, RP ID), so
+  // there is no real library failure left to reach it on purpose — it is left
+  // untested, per the task brief.
 });
 
 // ---------------------------------------------------------------------------

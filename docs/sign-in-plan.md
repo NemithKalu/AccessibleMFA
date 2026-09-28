@@ -357,26 +357,95 @@ automated check in `npm test`; they are part of the by-hand pass in step 6.
 
 ### Step 6: Tests
 
-Automated, using the existing `node:test` setup:
+Built as planned, in three parts.
 
-- The sign-in page has one heading, the controls in the specified order, and a
-  status message area.
-- The device prompt timeout is 5 minutes and a sign-in request outlasts it.
-- Each server-side failure returns its specific message.
+**A. The remaining sign-in failure codes.** `test/signin-messages.test.js`
+already produced eight of the server's failure codes over real HTTP; six more
+were added in the same style, each asserting the code, the "Sign-in was not
+completed." prefix, and (as before) the spokenLine drift check:
 
-By hand, with keyboard only and then with VoiceOver:
+- `unknown-passkey` — a fresh, never-registered `SoftwareAuthenticator`
+  answers a real challenge.
+- `wrong-origin` — a registered authenticator signs with
+  `origin: 'http://evil.example'`. Confirmed against
+  `verifyAuthenticationResponse`'s own source: it checks the client data's
+  origin before it ever looks at the RP ID, so this really does exercise the
+  origin check and nothing else.
+- `wrong-site` — the same authenticator instead signs with
+  `rpId: 'evil.example'`, which corrupts the RP ID hash baked into the signed
+  authenticator data while the origin stays correct. The library's own
+  "Unexpected RP ID hash" error is what fires, and
+  `translateVerificationError`'s `/RP ID/i` test is what turns that into
+  `wrong-site` — checked against the real library behaviour, not assumed.
+- `request-mismatch` — a client asks for **registration** options (leaving a
+  `register` challenge on the session), then posts straight to
+  `/webauthn/auth/verify`. `consumeChallenge` rejects the purpose mismatch
+  before the body is even read.
+- `not-present` — `test/authenticator.js`'s `SoftwareAuthenticator.authenticate`
+  (and its `flags()` helper) gained an opt-in `userPresent` parameter,
+  defaulting to `true` so every existing test is unaffected. Setting it to
+  `false` produces the one combination a real authenticator would never send
+  (verified but not present) — exactly what is needed to reach the server's
+  own not-present check on purpose, without weakening what a real
+  authenticator can produce.
 
-- Successful sign-in
-- Cancelling at the device prompt
-- Letting the prompt time out
-- Rejection (Chrome's virtual authenticator with user verification switched off)
-- The server stopped
-- "Use another method"
-- Guidance turned on, turned off and replayed
+`not-verified-other` is the library's catch-all for a verification failure
+that matches none of `translateVerificationError`'s regexes. Every failure
+`@simplewebauthn/server` can actually raise is already covered by the codes
+above (user verification, user presence, counter, challenge, origin, RP ID),
+so there is no genuine library failure left that reaches it — it is
+deliberately left untested rather than faked.
 
-A short test log template will record the device, browser, screen reader and
-outcome of each run. No testing with blind or low-vision participants is
-claimed unless it actually happens.
+**B. `test/semantics.test.js` — structure, on every page.** Twelve rules
+(one `<html lang="en">`, a single `<h1>`, no skipped heading levels, the skip
+link as the page's first focusable element plus a `#main` target, every input
+labelled, every button with real text, no dangling `aria-describedby` /
+`aria-labelledby` / `label for`, no duplicate id, no positive `tabindex`,
+every link with real text, and a `#status` live region on any page that loads
+a `/js/` script) are checked with plain string/regex parsing — no new
+dependency — against twelve rendered pages: the six anonymous pages
+(`/`, `/signin`, `/signin/other`, `/recover`, `/register`, a 404), four pages
+behind a full session (`/account`, `/recovery-codes` before and just after
+generating a set, `/activity`), and two behind a restricted recovery session
+(`/recover/status`, `/account`). Each rule is its own `it()` per page — 144
+checks in total — generated in a loop so a failure names the exact page and
+rule. `<script>` bodies and HTML comments are stripped before eleven of the
+twelve checks run (several of this app's own comments contain the literal
+text `aria-live="polite"` as commentary); the twelfth, which has to see which
+scripts a page loads, strips only the comments.
+
+One genuine gap turned up: `/recover`'s form is a plain full-page POST, and
+its template had never gained the `#status` live region that every other
+scripted page carries, even though it shares `recover.js` with
+`/recover/status`, which does write to it. `views/recover.ejs` now includes
+`partials/status` like the others, so the shared script always has somewhere
+safe to announce if it is ever asked to. Nothing else the checks found needed
+a template change.
+
+**C. By hand.** `docs/testing/sign-in-test-log.md` is the script and results
+log the automated checks cannot replace: the OS passkey prompt, real focus
+movement, what VoiceOver actually says, speech timing, zoom. It declares the
+test setup (Safari, VoiceOver, Touch ID; Chrome's virtual authenticator only
+for the user-verification-off case), a "before you start" setup, 19 numbered
+test cases (successful sign-in with and without typing, cancelling, the
+5-minute timeout, user verification off, an unknown or empty username, the
+server stopped before and during the prompt, "Use another method" carrying
+the username, reading/replaying/stopping guidance, keyboard-only navigation,
+the VoiceOver headings rotor, 400% zoom, 200% text, and an optional braille
+check), a results log, and a participant-feedback template.
+
+The log's first entry, run 1, is a scripted check in headless Chromium: the
+passkey prompt, network failures and speech were replaced in the page by
+stand-ins, and each case's message, focus position, busy state and spoken
+lines were read back. Cases 3, 6–9, 13, 14, 17 and 18 passed; 10, 12 and 15
+were only partly covered. It is recorded as what it is, not as a usability
+test: no screen reader ran, and Touch ID, VoiceOver and Safari still need a
+by-hand run. It states plainly, matching the individual
+document's own point about validation, that a script followed by the person
+who wrote the code is not evidence of validated accessibility, and that no
+testing with blind or low-vision participants has happened yet.
+
+`npm test` now runs 272 tests across 37 suites, all passing.
 
 ### Step 7: Documents
 
