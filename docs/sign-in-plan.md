@@ -255,16 +255,105 @@ script the link still works, it just doesn't carry the name.
 
 ### Step 5: Low vision and Braille
 
-File: `public/css/style.css`.
+Files: `public/css/style.css`, new `test/contrast.test.js`.
 
-- Check that every colour pair meets 4.5:1 contrast (WCAG 1.4.3). Replace the
-  60% opacity busy button, which lowers the contrast of "Waiting for your
-  device…".
-- Test at 200% text size (1.4.4) and 400% zoom, 320 px wide (1.4.10).
-- Keep the visible focus indicator (2.4.7).
-- Make targets at least 24 by 24 px (2.5.8).
-- Keep the outcome at the start of every message, so it is the first thing on a
-  Braille line.
+Every colour in the stylesheet was moved into a named custom property on
+`:root` (`--panel`, `--panel-soft`, `--success`, `--success-bg`, `--error`,
+`--error-bg`, and a new `--control-border`), so there is one place to check
+and one place to fix. No hex value appears anywhere else in the file.
+
+**Automated contrast audit.** `test/contrast.test.js` reads `style.css`,
+parses the `:root` custom properties, and computes the WCAG contrast ratio
+(relative luminance with sRGB linearisation) for every colour pair actually
+used on a page, found by reading the templates rather than guessed. It runs
+as part of `npm test`, so a future colour change that breaks contrast fails
+the build instead of shipping. Measured ratios, from the test:
+
+| Pair | What it is | Minimum | Measured | Pass |
+|---|---|---|---|---|
+| `--ink` on `--paper` | body text on the page | 4.5:1 | 17.63:1 | yes |
+| `--muted` on `--paper` | hint text on the page | 4.5:1 | 8.68:1 | yes |
+| `--accent` on `--paper` | link text on the page | 4.5:1 | 8.04:1 | yes |
+| `--paper` on `--accent` | button label on an accent button | 4.5:1 | 8.04:1 | yes |
+| `--accent` on `--paper` | secondary button / button-link label | 4.5:1 | 8.04:1 | yes |
+| `--accent` on `--paper` | busy/disabled button label | 4.5:1 | 8.04:1 | yes (was 3.11:1 at 60% opacity — see below) |
+| `--paper` on `--error` | danger button label ("Turn off …") | 4.5:1 | 7.54:1 | yes |
+| `--muted` on `--paper` | tag text ("Turned off", etc.) | 4.5:1 | 8.68:1 | yes |
+| `--ink` on `--panel` | status text, default (info) background | 4.5:1 | 15.99:1 | yes |
+| `--ink` on `--success-bg` | status text, success background | 4.5:1 | 15.78:1 | yes |
+| `--ink` on `--error-bg` | status text, error background | 4.5:1 | 15.38:1 | yes |
+| `--ink` on `--panel-soft` | notice text ("What happens when you sign in") | 4.5:1 | 16.71:1 | yes |
+| `--accent` on `--error-bg` | link text inside the account page's warning notice | 4.5:1 | 7.01:1 | yes |
+| `--paper` on `--ink` | skip link text on its dark fill | 4.5:1 | 17.63:1 | yes |
+| `--control-border` on `--paper` | text field's border against the page | 3:1 | 3.51:1 | yes (was 1.84:1 with `--line` — fixed) |
+| `--focus` on `--paper` | focus outline against the page | 3:1 | 5.36:1 | yes |
+| `--focus` on `--error-bg` | focus outline against an error-toned notice | 3:1 | 4.67:1 | yes |
+| `--accent` on `--paper` | secondary/busy button border against the page | 3:1 | 8.04:1 | yes |
+
+**What failed and how it was fixed.**
+
+1. `input[type="text"]`'s border used `--line` (`#b9c0c8`), about 1.84:1
+   against white — below the 3:1 that 1.4.11 needs for a low-vision user to
+   see where a field is. Added `--control-border` (`#818a93`, 3.51:1) and
+   pointed inputs at it. `--line` is kept for purely decorative dividers and
+   borders (the header/footer rules, `ul.devices li`, `.prompt-notice`) —
+   1.4.11 only covers boundaries that identify a control, not decoration, and
+   a comment in the stylesheet says so.
+2. `button[disabled] { opacity: 0.6 }` dimmed "Waiting for your device…" on
+   the register and account pages while it was the only clue something was
+   happening. The sign-in page already had an outlined look for
+   `button[aria-disabled="true"]` (used there instead of `disabled`, so the
+   button stays focusable); `button[disabled]` was merged into the same rule,
+   so both states now keep the full-contrast accent-on-paper label instead of
+   dimming. The old dimmed label measured 3.11:1 (white on 60%-opacity
+   accent), below the 4.5:1 minimum.
+3. That outlined busy look was identical to an ordinary outlined control, so
+   on the sign-in page a busy "Sign in with a passkey" looked just like "Use
+   another method" beside it. Busy and disabled buttons now have a dashed
+   border, which tells them apart without changing any colour.
+
+**Reflow (1.4.10) and resize.** Added `overflow-wrap: anywhere` to `main`,
+where every long unbroken string in the app can appear — a 32-character
+username, the `http://localhost:3000` origin quoted in the prompt notice,
+device names, and recovery codes — so none of them can force horizontal
+scrolling at 320 CSS px. Checked the rest of the stylesheet by hand: no `px`
+font sizes anywhere (all type is in `rem`, so 200% resize and text-spacing
+(1.4.12) are unaffected) and no fixed heights other than `.status`'s
+`min-height`, which only sets a floor and cannot clip growing text.
+
+**Target size (2.5.8).** Measured in the browser, not worked out from the
+CSS. Buttons, `a.button-link`, the skip link and the text fields are all well
+over 24×24 CSS px. The header links ("Home", "Create an account", "Sign in")
+were only 20px tall, because a bare inline link is only as tall as its text.
+They would have passed through the rule's spacing exception, since nothing
+else sits within 24px of them, but they are the most-used controls on every
+page, so they now have vertical padding and measure 35px. Standalone links in
+their own paragraph (such as "Back to signing in") are also 20px tall and
+still rely on the spacing exception, which they meet.
+
+**Checked in the browser.** Each page (`/`, `/signin`, `/signin/other`,
+`/recover`, `/register` and the not-found page) was loaded into a 320px-wide
+frame and into a 640px frame with the root font size at 200%, with a
+32-character username in the page and in a failure message. None scrolled
+sideways (`scrollWidth` equal to the viewport width in every case); the long
+username wraps inside the message box.
+
+**Meaning not by colour alone (1.4.1).** The status region already carries a
+word for every tone ("Success. …", "Sign-in was not completed. …" — never a
+bare colour change), and the account page's device states are shown as text
+tags ("Turned off", "This device, signed in now") rather than colour coding.
+Confirmed, nothing relies on colour alone; nothing changed here.
+
+**Focus (2.4.7)** was already visible everywhere via `:focus-visible` and was
+not touched, beyond checking the ring's own contrast in the table above.
+
+**Braille.** Nothing in this step changes message wording, so the outcome
+staying first on the line (done in step 2) is unaffected; confirmed by
+reading through `signin-messages.js` again.
+
+The automated test re-checks contrast on every `npm test` run. Reflow, zoom
+and target size were measured in the browser as described above, but have no
+automated check in `npm test`; they are part of the by-hand pass in step 6.
 
 ### Step 6: Tests
 

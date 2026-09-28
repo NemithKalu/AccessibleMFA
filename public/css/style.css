@@ -1,13 +1,29 @@
 /* Deliberately plain. Every rule here exists for legibility or for keyboard
    and screen-reader users — nothing decorative. */
 
+/* Every colour is a named token here so contrast can be checked in one
+   place. test/contrast.test.js reads this block and re-checks the contrast
+   ratio of every pair used on the pages on every test run. */
 :root {
   --ink: #16191d;
   --paper: #ffffff;
   --muted: #454c55;
+  /* Purely decorative dividers and borders (rules, list-item outlines) —
+     1.4.11 non-text contrast does not apply to these. */
   --line: #b9c0c8;
+  /* 1.4.11: a form control's border has to be seen at 3:1 against the page
+     so a low-vision user can find the field. --line is only ~1.8:1, so
+     inputs use this darker tone instead; --line stays for the decorative
+     uses above. */
+  --control-border: #818a93;
   --accent: #0b4f9c;
   --focus: #b8460e;
+  --panel: #f2f4f6;
+  --panel-soft: #f7f9fb;
+  --success: #1d6b3a;
+  --success-bg: #eaf5ee;
+  --error: #a32020;
+  --error-bg: #fbecec;
 }
 
 * { box-sizing: border-box; }
@@ -23,6 +39,11 @@ main {
   max-width: 44rem;
   margin: 0 auto;
   padding: 1.5rem 1rem 4rem;
+  /* 1.4.10 reflow: a long unbroken string (a 32-character username, the
+     "http://localhost:3000" origin, a device name, a recovery code) must
+     never force horizontal scrolling at 320px wide. Scoped to main, where
+     all of those appear, rather than the whole page. */
+  overflow-wrap: anywhere;
 }
 
 h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 1rem; }
@@ -76,6 +97,14 @@ header nav ul {
   max-width: 44rem;
 }
 header nav form { margin: 0; }
+/* 2.5.8 target size: a bare inline link is only as tall as its text (about
+   20px here). These are the most-used controls on every page, so they get
+   enough padding to be a 24px-plus target in their own right rather than
+   leaning on the spacing exception. */
+header nav a {
+  display: inline-block;
+  padding: 0.25rem 0;
+}
 
 label {
   display: block;
@@ -91,7 +120,7 @@ label {
 input[type="text"] {
   font: inherit;
   padding: 0.55rem 0.6rem;
-  border: 2px solid var(--line);
+  border: 2px solid var(--control-border);
   border-radius: 4px;
   width: 100%;
   max-width: 22rem;
@@ -110,14 +139,18 @@ button {
   cursor: pointer;
 }
 button.secondary { background: var(--paper); color: var(--accent); }
-button[disabled] { opacity: 0.6; cursor: progress; }
-/* aria-disabled (used on the sign-in page instead of the disabled attribute,
-   so the button stays focusable). It switches to the outlined look so a
-   low-vision user can see it will not respond, rather than dimming it —
-   dimming would drop its text contrast below 4.5:1. */
+/* Busy buttons: the `disabled` attribute (register/account pages' setBusy)
+   and `aria-disabled` (the sign-in page, which keeps the button focusable —
+   see webauthn-client.js's markBusy) get the same outlined look rather than
+   dimming. Dimming with opacity would drop "Waiting for your device…" below
+   4.5:1 while it's the only clue something is happening. The dashed border
+   is what tells it apart from an ordinary outlined control such as "Use
+   another method", without changing any colour. */
+button[disabled],
 button[aria-disabled="true"] {
   background: var(--paper);
   color: var(--accent);
+  border-style: dashed;
   cursor: not-allowed;
 }
 
@@ -129,12 +162,12 @@ button[aria-disabled="true"] {
   margin: 1.25rem 0;
   padding: 0.75rem 0.9rem;
   border-left: 6px solid var(--line);
-  background: #f2f4f6;
+  background: var(--panel);
   min-height: 1.5rem;
 }
 .status:empty { display: none; }
-.status[data-tone="success"] { border-left-color: #1d6b3a; background: #eaf5ee; }
-.status[data-tone="error"] { border-left-color: #a32020; background: #fbecec; }
+.status[data-tone="success"] { border-left-color: var(--success); background: var(--success-bg); }
+.status[data-tone="error"] { border-left-color: var(--error); background: var(--error-bg); }
 
 /* The main sign-in controls. Wraps on narrow screens so nothing needs
    horizontal scrolling down to 320px wide. */
@@ -165,7 +198,7 @@ a.button-link {
   border: 2px solid var(--line);
   border-radius: 4px;
   padding: 0.75rem 0.9rem;
-  background: #f7f9fb;
+  background: var(--panel-soft);
 }
 
 ul.devices { list-style: none; padding: 0; }
@@ -211,9 +244,9 @@ ol.codes code {
 .device-actions { margin-top: 0.9rem; }
 .device-actions .field { margin-bottom: 0.6rem; }
 .device-actions form { display: inline-block; margin: 0 0.4rem 0.4rem 0; vertical-align: top; }
-button.danger { background: #a32020; }
+button.danger { background: var(--error); }
 
-.prompt-notice[data-tone="error"] { border-left: 4px solid #a32020; background: #fbecec; }
+.prompt-notice[data-tone="error"] { border-left: 4px solid var(--error); background: var(--error-bg); }
 
 ul.activity { list-style: none; padding: 0; }
 ul.activity li {
