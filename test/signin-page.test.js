@@ -135,6 +135,6 @@ describe('the sign-in page, as an anonymous visitor', () => {
     const html = await getSignInPage();
     const control = html.match(/<a[^>]*id="other-method-link"[^>]*>/)?.[0];
     assert.ok(control, 'expected an <a> with id="other-method-link"');
-    assert.match(control, /href="\/recover"/);
+    assert.match(control, /href="\/signin\/other"/);
   });
 });

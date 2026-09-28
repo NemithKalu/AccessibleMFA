@@ -9,12 +9,16 @@ import { requireSession } from '../guards.js';
 import * as recovery from '../recovery.js';
 import { hashCode } from '../recovery-codes.js';
 import { startSession } from '../session.js';
+import { usernameFromQuery } from '../text.js';
 
 const router = Router();
 
 router.get('/recover', (req, res) => {
   if (req.session.userId) return res.redirect('/recover/status');
-  res.render('recover', { title: 'Lost your device', error: null, username: '' });
+  // Pre-fills the username when it arrived from "Other ways to sign in" —
+  // usernameFromQuery only ever returns something already shaped like a
+  // valid username, so nothing user-supplied is reflected unchecked.
+  res.render('recover', { title: 'Lost your device', error: null, username: usernameFromQuery(req.query.username) });
 });
 
 // Failures here re-render the form with the reason above it, rather than

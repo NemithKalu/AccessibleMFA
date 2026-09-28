@@ -14,11 +14,9 @@ import { AuthError } from '../errors.js';
 import * as db from '../db.js';
 import * as recovery from '../recovery.js';
 import { startSession } from '../session.js';
-import { cleanLabel } from '../text.js';
+import { cleanLabel, USERNAME_PATTERN } from '../text.js';
 
 const router = Router();
-
-const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 
 /**
  * `context` is 'register' (the default) or 'authenticate'. The check and the

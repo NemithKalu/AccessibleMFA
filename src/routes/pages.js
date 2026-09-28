@@ -4,6 +4,7 @@ import { Router } from 'express';
 import * as db from '../db.js';
 import { listAuditEntries } from '../db.js';
 import { requireSession } from '../guards.js';
+import { usernameFromQuery } from '../text.js';
 
 const router = Router();
 
@@ -21,6 +22,19 @@ router.get('/signin', (req, res) => {
   res.render('signin', {
     title: 'Sign in',
     arrivalMessage: SIGNIN_MESSAGES[req.query.from] ?? null,
+    // Set when coming back from "Other ways to sign in", so the name typed
+    // before does not have to be typed again. Only a valid username is kept.
+    username: usernameFromQuery(req.query.username),
+  });
+});
+
+// "Use another method" from the sign-in page (plan step 4). Reached only by
+// the user's own choice — nothing here redirects a visitor to it (AR-10).
+router.get('/signin/other', (req, res) => {
+  if (req.session.userId) return res.redirect('/account');
+  res.render('signin-other', {
+    title: 'Other ways to sign in',
+    username: usernameFromQuery(req.query.username),
   });
 });
 

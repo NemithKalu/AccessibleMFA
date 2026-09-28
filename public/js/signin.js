@@ -23,6 +23,21 @@
   var submit = document.getElementById('submit');
   var passkeyButton = document.getElementById('passkey-button');
   var usernameInput = document.getElementById('username');
+  var otherMethodLink = document.getElementById('other-method-link');
+
+  // Carries a typed username on to "Other ways to sign in", so it doesn't
+  // need retyping there. Without this script the link still works — it just
+  // doesn't carry the name. Wired up before the unsupported-passkeys check
+  // below, so it still works on that path too.
+  if (otherMethodLink && usernameInput) {
+    usernameInput.addEventListener('input', function () {
+      var typed = usernameInput.value.trim();
+      otherMethodLink.href = typed
+        ? '/signin/other?username=' + encodeURIComponent(typed)
+        : '/signin/other';
+    });
+  }
+
   /**
    * Reading `window.localStorage` can itself throw (some browsers raise a
    * SecurityError from the property getter when site data is blocked, not

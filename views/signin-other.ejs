@@ -1,0 +1,47 @@
+<%- include('partials/header', { title: title }) %>
+
+<h1>Other ways to sign in</h1>
+
+<p>
+  If you can't use a passkey right now, here are the other ways in. Signing in
+  with a passkey is still the safest way, so use one when you can.
+</p>
+
+<h2>If your passkey is on another device or a security key</h2>
+<p>
+  Your passkey may be on a different device, or on a security key you plug in.
+  Go back and choose “Sign in with your username instead” — that lets you pick
+  that device, or plug in the key, instead of the one this browser tried first.
+</p>
+<%# The username, if one came with us, goes back too, so it is already in the
+    username field on return. %>
+<p>
+  <a href="/signin<%= username ? '?username=' + encodeURIComponent(username) : '' %>">Go back to signing in</a>
+</p>
+
+<h2>If you have lost every device with a passkey</h2>
+<p>You can use a recovery code instead. What happens, in order:</p>
+<%# Numbered, like the fuller list on /recover: these happen one after the
+    other, and the order (wait first, new passkey last) is the point. %>
+<ol>
+  <li>The code is used up: each one works only once.</li>
+  <li>You can look at your account, but not change it.</li>
+  <li>A 24-hour wait begins, and you are told on your other contact channels.</li>
+  <li>Anyone who can still sign in normally can cancel it.</li>
+  <li>After the wait, you add a new passkey and the old ones stop working.</li>
+</ol>
+<p>
+  <a href="/recover<%= username ? '?username=' + encodeURIComponent(username) : '' %>">Use a recovery code</a>
+</p>
+
+<%# Phase 2: a trusted-phone code plus password will be added here as another
+    restricted-session route, once it is actually built. Only routes that
+    work today are listed on this page. %>
+
+<h2>If you have no recovery code</h2>
+<p>
+  There is no automatic way in without one. Contact support and prove who you
+  are another way.
+</p>
+
+<%- include('partials/footer') %>
