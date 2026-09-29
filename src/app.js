@@ -6,7 +6,7 @@ import session from 'express-session';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SESSION_SECRET, ORIGIN } from './config.js';
+import { SESSION_SECRET, ORIGIN, RP_NAME } from './config.js';
 import { findUserById } from './db.js';
 import { AuthError } from './errors.js';
 import pagesRouter from './routes/pages.js';
@@ -52,6 +52,7 @@ app.use((req, res, next) => {
   res.locals.currentUser = req.session.userId ? findUserById(req.session.userId) : null;
   res.locals.sessionLevel = req.session.level ?? null;
   res.locals.origin = ORIGIN;
+  res.locals.siteName = RP_NAME;
   next();
 });
 
@@ -79,11 +80,14 @@ app.use((err, req, res, _next) => {
   const message = isAuthError
     ? err.message
     : 'Something went wrong on our side. Please try again.';
+  const code = isAuthError ? err.code : undefined;
 
   if (req.accepts('html') && !req.is('application/json')) {
     return res.status(status).render('error', { title: 'Something went wrong', message });
   }
-  res.status(status).json({ error: message });
+  // code is only present for the newer, machine-readable failures (currently
+  // the sign-in path); older callers keep getting just { error }.
+  res.status(status).json(code ? { error: message, code } : { error: message });
 });
 
 export default app;

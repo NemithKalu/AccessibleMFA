@@ -59,8 +59,13 @@ export class SoftwareAuthenticator {
     );
   }
 
-  flags({ userVerified, attested }) {
-    let flags = FLAG_USER_PRESENT;
+  // `userPresent` defaults to true (a real authenticator always sets it) and
+  // exists only so a test can clear it — producing the invalid "verified but
+  // not present" combination needed to exercise the server's not-present
+  // check on purpose, without weakening what a real authenticator can send.
+  flags({ userVerified, userPresent = true, attested }) {
+    let flags = 0;
+    if (userPresent) flags |= FLAG_USER_PRESENT;
     if (userVerified) flags |= FLAG_USER_VERIFIED;
     if (this.backupEligible) flags |= FLAG_BACKUP_ELIGIBLE;
     if (this.backedUp) flags |= FLAG_BACKED_UP;
@@ -68,10 +73,10 @@ export class SoftwareAuthenticator {
     return flags;
   }
 
-  authenticatorData({ rpId, userVerified, attested, counter }) {
+  authenticatorData({ rpId, userVerified, userPresent, attested, counter }) {
     const header = Buffer.alloc(37);
     sha256(rpId).copy(header, 0);
-    header[32] = this.flags({ userVerified, attested });
+    header[32] = this.flags({ userVerified, userPresent, attested });
     header.writeUInt32BE(counter, 33);
 
     if (!attested) return header;
@@ -132,12 +137,21 @@ export class SoftwareAuthenticator {
    * `counter` overrides the reported signature count, so a test can simulate
    * a cloned authenticator replaying an old one.
    */
-  authenticate({ rpId, origin, challenge, userHandle, userVerified = true, counter }) {
+  authenticate({
+    rpId,
+    origin,
+    challenge,
+    userHandle,
+    userVerified = true,
+    userPresent = true, // opt out to simulate no touch/button press (the not-present failure)
+    counter,
+  }) {
     const reportedCounter = counter ?? ++this.counter;
     const clientDataJSON = this.clientData('webauthn.get', challenge, origin);
     const authData = this.authenticatorData({
       rpId,
       userVerified,
+      userPresent,
       attested: false,
       counter: reportedCounter,
     });

@@ -95,6 +95,8 @@ describe('revoking a passkey', () => {
     // allowCredentials is only a hint the client is free to ignore.
     const attempt = await signIn('dev-carol', second);
     assert.equal(attempt.verified.status, 400);
+    assert.equal(attempt.verified.body.code, 'passkey-turned-off');
+    assert.match(attempt.verified.body.error, /^Sign-in was not completed\./);
     assert.match(attempt.verified.body.error, /turned off/);
   });
 

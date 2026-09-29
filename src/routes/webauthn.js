@@ -8,21 +8,33 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 
-import { ORIGIN, RP_ID, RP_NAME } from '../config.js';
+import { ORIGIN, PASSKEY_PROMPT_TIMEOUT_MS, RP_ID, RP_NAME } from '../config.js';
 import { consumeChallenge, issueChallenge } from '../challenge.js';
 import { AuthError } from '../errors.js';
 import * as db from '../db.js';
 import * as recovery from '../recovery.js';
 import { startSession } from '../session.js';
-import { cleanLabel } from '../text.js';
+import { cleanLabel, USERNAME_PATTERN } from '../text.js';
 
 const router = Router();
 
-const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
-
-function normaliseUsername(raw) {
+/**
+ * `context` is 'register' (the default) or 'authenticate'. The check and the
+ * pattern are identical either way; only the wording differs, because the
+ * sign-in path follows the plan's "Sign-in was not completed. <reason>. <next
+ * step>." pattern and carries a machine-readable code, while registration's
+ * wording is unchanged from before.
+ */
+function normaliseUsername(raw, context) {
   const username = String(raw ?? '').trim().toLowerCase();
   if (!USERNAME_PATTERN.test(username)) {
+    if (context === 'authenticate') {
+      throw new AuthError(
+        'Sign-in was not completed. Usernames are 3 to 32 characters: letters, numbers, dots, dashes or underscores. Check what you typed and try again.',
+        400,
+        'invalid-username',
+      );
+    }
     throw new AuthError(
       'That username will not work. Use 3 to 32 characters: letters, numbers, dots, dashes or underscores.',
     );
@@ -87,6 +99,9 @@ router.post('/register/options', async (req, res) => {
     // WebAuthn's user.id is the random handle, never the username or row id.
     userID: Buffer.from(userHandle, 'base64url'),
     challenge,
+    // The library default is 60s; see PASSKEY_PROMPT_TIMEOUT_MS for why that
+    // is too short here.
+    timeout: PASSKEY_PROMPT_TIMEOUT_MS,
     attestationType: 'none',
     // Stops the same authenticator being registered twice on one account: the
     // browser refuses rather than silently creating a second credential.
@@ -201,7 +216,7 @@ router.post('/auth/options', async (req, res) => {
   let allowCredentials; // left undefined for the usernameless path
 
   if (rawUsername) {
-    const username = normaliseUsername(rawUsername);
+    const username = normaliseUsername(rawUsername, 'authenticate');
     const user = db.findUserByUsername(username);
 
     // This tells an attacker whether a username exists. That is a deliberate
@@ -211,14 +226,18 @@ router.post('/auth/options', async (req, res) => {
     // screen-reader user with a prompt that lists nothing and no explanation.
     if (!user) {
       throw new AuthError(
-        `There is no account with the username “${username}”. Check the spelling, or create an account.`,
+        `Sign-in was not completed. There is no account called “${username}”. Check the spelling, or create an account.`,
+        400,
+        'no-account',
       );
     }
 
     const credentials = db.listActiveCredentials(user.id);
     if (credentials.length === 0) {
       throw new AuthError(
-        'That account has no passkeys that can be used, so it cannot be signed in to. Use a recovery code instead.',
+        'Sign-in was not completed. That account has no passkeys that can be used. Use another method.',
+        400,
+        'no-usable-passkeys',
       );
     }
 
@@ -238,6 +257,9 @@ router.post('/auth/options', async (req, res) => {
     allowCredentials,
     // REQUIRED — the UV flag is the second factor.
     userVerification: 'required',
+    // The library default is 60s; see PASSKEY_PROMPT_TIMEOUT_MS for why that
+    // is too short here.
+    timeout: PASSKEY_PROMPT_TIMEOUT_MS,
   });
 
   res.json(options);
@@ -250,7 +272,9 @@ router.post('/auth/verify', async (req, res) => {
   const stored = db.findCredentialById(String(req.body.id ?? ''));
   if (!stored) {
     throw new AuthError(
-      'That passkey is not registered with this site. Try another passkey, or create an account.',
+      "Sign-in was not completed. This passkey isn't registered with this website. Try a different passkey, or use another method.",
+      400,
+      'unknown-passkey',
     );
   }
 
@@ -259,7 +283,9 @@ router.post('/auth/verify', async (req, res) => {
   // a lost device can still present its credential without being asked.
   if (stored.status !== 'active') {
     throw new AuthError(
-      'That passkey was turned off for this account and can no longer be used to sign in.',
+      'Sign-in was not completed. This passkey was turned off for your account. Use a different passkey, or use another method.',
+      400,
+      'passkey-turned-off',
     );
   }
 
@@ -270,7 +296,11 @@ router.post('/auth/verify', async (req, res) => {
   if (userHandle) {
     const claimed = db.findUserByHandle(userHandle);
     if (!claimed || claimed.id !== stored.userId) {
-      throw new AuthError('That passkey does not match the account it claims. Please try again.');
+      throw new AuthError(
+        'Sign-in was not completed. This passkey belongs to a different account than the one it named. Try again.',
+        400,
+        'account-mismatch',
+      );
     }
   }
 
@@ -292,7 +322,11 @@ router.post('/auth/verify', async (req, res) => {
 
   const { verified, authenticationInfo } = verification;
   if (!verified) {
-    throw new AuthError('That passkey could not be verified. Please try again.');
+    throw new AuthError(
+      'Sign-in was not completed. This passkey could not be verified. Try again, or use another method.',
+      400,
+      'not-verified-other',
+    );
   }
 
   // Same belt-and-braces check as registration: never accept an assertion
@@ -300,7 +334,9 @@ router.post('/auth/verify', async (req, res) => {
   // multi-factor rather than possession of the device alone.
   if (!authenticationInfo.userVerified) {
     throw new AuthError(
-      'Your device did not confirm it was you, so you were not signed in. Please try again and complete the fingerprint, face or PIN check.',
+      'Sign-in was not completed. Your device did not confirm it was you with your fingerprint, face or PIN. Try again and complete that check.',
+      400,
+      'not-verified',
     );
   }
 
@@ -335,32 +371,89 @@ async function explainFailures(context, run) {
   } catch (error) {
     if (error instanceof AuthError) throw error;
     console.warn(`[webauthn:${context}] ${error.message}`);
-    throw new AuthError(translateVerificationError(error.message, context));
+    throw translateVerificationError(error.message, context);
   }
 }
 
+/**
+ * Builds the AuthError to throw for a library verification failure.
+ *
+ * `context` ('register' or 'authenticate') is the same context that was
+ * already threaded through from the calling route, and is what picks the
+ * wording and code: sign-in follows the plan's "Sign-in was not completed.
+ * <reason>. <next step>." pattern with a code, registration keeps its
+ * original wording unchanged.
+ */
 function translateVerificationError(message, context) {
+  const authenticate = context === 'authenticate';
+
   if (/user verification/i.test(message)) {
-    return 'Your device did not confirm it was you, so you were not signed in. Please try again and complete the fingerprint, face or PIN check.';
+    return authenticate
+      ? new AuthError(
+          'Sign-in was not completed. Your device did not confirm it was you with your fingerprint, face or PIN. Try again and complete that check.',
+          400,
+          'not-verified',
+        )
+      : new AuthError(
+          'Your device did not confirm it was you, so you were not signed in. Please try again and complete the fingerprint, face or PIN check.',
+        );
   }
   if (/user not present/i.test(message)) {
-    return 'Your device did not register a touch or a button press. Please try again.';
+    return authenticate
+      ? new AuthError(
+          'Sign-in was not completed. Your device did not register a touch or a button press. Try again.',
+          400,
+          'not-present',
+        )
+      : new AuthError('Your device did not register a touch or a button press. Please try again.');
   }
   if (/counter value/i.test(message)) {
-    return 'This passkey reported an out-of-date use count, which can mean it has been copied. It was not accepted. Please use another passkey.';
+    return authenticate
+      ? new AuthError(
+          'Sign-in was not completed. This passkey may have been copied, so it was refused to protect you. Use a different passkey.',
+          400,
+          'possible-copy',
+        )
+      : new AuthError(
+          'This passkey reported an out-of-date use count, which can mean it has been copied. It was not accepted. Please use another passkey.',
+        );
   }
   if (/challenge/i.test(message)) {
-    return 'That request has expired or was already used. Please start again.';
+    return authenticate
+      ? new AuthError(
+          'Sign-in was not completed. The request expired or was already used. Try again.',
+          400,
+          'request-expired',
+        )
+      : new AuthError('That request has expired or was already used. Please start again.');
   }
   if (/origin/i.test(message)) {
-    return 'The request came from the wrong web address, so it was refused. Open the site again from the start.';
+    return authenticate
+      ? new AuthError(
+          'Sign-in was not completed. The request came from the wrong web address, so it was refused. Open the site again from the start.',
+          400,
+          'wrong-origin',
+        )
+      : new AuthError(
+          'The request came from the wrong web address, so it was refused. Open the site again from the start.',
+        );
   }
   if (/RP ID/i.test(message)) {
-    return 'That passkey belongs to a different website, so it cannot be used here.';
+    return authenticate
+      ? new AuthError(
+          "Sign-in was not completed. This passkey belongs to a different website, so it cannot be used here.",
+          400,
+          'wrong-site',
+        )
+      : new AuthError('That passkey belongs to a different website, so it cannot be used here.');
   }
-  return context === 'register'
-    ? 'That passkey could not be verified, so it was not saved. Please try again.'
-    : 'That passkey could not be verified, so you were not signed in. Please try again.';
+  return authenticate
+    ? new AuthError(
+        'Sign-in was not completed. This passkey could not be verified. Try again, or use another method.',
+        400,
+        'not-verified-other',
+      )
+    : new AuthError('That passkey could not be verified, so it was not saved. Please try again.');
 }
 
 /**
@@ -378,8 +471,12 @@ function assertCounterIsSane(storedCounter, newCounter) {
   if (storedCounter === 0 && newCounter === 0) return;
   if (newCounter > storedCounter) return;
 
+  // Only ever called on the sign-in path (registration has no prior counter
+  // to compare against), so the message always carries the sign-in wording.
   throw new AuthError(
-    'This passkey reported an out-of-date use count, which can mean it has been copied. It was not accepted. Please use another passkey.',
+    'Sign-in was not completed. This passkey may have been copied, so it was refused to protect you. Use a different passkey.',
+    400,
+    'possible-copy',
   );
 }
 

@@ -8,9 +8,10 @@
   <p class="status" data-tone="info"><%= arrivalMessage %></p>
 <% } %>
 
-<p>Sign in with the passkey you created. There is no password to type.</p>
-
-<%- include('partials/status') %>
+<p>
+  Sign in to the <%= siteName %> with your passkey. There is no password to
+  type.
+</p>
 
 <!--
   Accessibility rule: say what is about to happen, in text, before the
@@ -25,28 +26,51 @@
   </p>
 </div>
 
-<h2>Sign in without typing</h2>
-<p>
-  If your passkey is on this device, it can offer you the right account
-  directly.
-</p>
-<p>
+<h2>Choose how to sign in</h2>
+
+<%- include('partials/status') %>
+
+<div class="sign-in-actions">
   <button type="button" id="passkey-button">Sign in with a passkey</button>
+  <%# Opens "Other ways to sign in" (plan step 4), which lists only the
+      routes that actually work today rather than jumping straight to the
+      recovery-code journey. signin.js carries a typed username across, when
+      there is one, so it does not need retyping there; a username already
+      filled in on arrival is carried in the markup, for when script has not
+      run. %>
+  <a class="button-link" id="other-method-link" href="/signin/other<%= username ? '?username=' + encodeURIComponent(username) : '' %>">Use another method</a>
+  <%# Hidden in the markup because speaking guidance needs script; the
+      voice-guidance wiring in signin.js un-hides this once it has run. A
+      visible control that does nothing yet would trap a screen-reader user
+      who activates it expecting something to happen. %>
+  <button type="button" id="read-guidance" hidden>Read guidance</button>
+  <%# Hidden until guidance is switched on; signin.js reveals it alongside
+      the note below, and hides it again (but not the note — see below) when
+      guidance is turned off. %>
+  <button type="button" id="stop-guidance" class="secondary" hidden>Stop guidance</button>
+</div>
+
+<%# Written version of the spoken introduction (AR-05), and voice guidance's
+    own small polite live region (signin.js sets its text) — kept separate
+    from #status above so guidance feedback never overwrites a sign-in
+    message still on screen. %>
+<p id="guidance-note" class="hint" role="status" aria-live="polite" hidden>
+  Voice guidance is on: each step of signing in is also read aloud. Use your
+  passkey to sign in. Your device will ask you to verify.
 </p>
 
-<p class="divider">— or —</p>
-
-<h2>Sign in with your username</h2>
+<h2>Sign in with your username instead</h2>
 <form id="signin-form" novalidate>
   <div class="field">
     <label for="username">Username</label>
     <p class="hint" id="username-hint">
-      Use this if your passkey is on another device or a security key.
+      Use this if your passkey is on a security key or another device.
     </p>
     <input
       type="text"
       id="username"
       name="username"
+      value="<%= username %>"
       autocomplete="username webauthn"
       aria-describedby="username-hint"
       autocapitalize="none"
@@ -57,12 +81,6 @@
   <p><button type="submit" id="submit">Continue</button></p>
 </form>
 
-<h2>Lost every device?</h2>
-<p>
-  If you cannot use any of your passkeys, you can
-  <a href="/recover">replace them with a recovery code</a>. It takes 24 hours.
-</p>
+<p>No account yet? <a href="/register">Create an account</a>.</p>
 
-<p>No account yet? <a href="/register">Create one</a>.</p>
-
-<%- include('partials/footer', { script: '/js/signin.js' }) %>
+<%- include('partials/footer', { scripts: ['/js/signin-messages.js', '/js/voice-guidance.js', '/js/signin.js'] }) %>

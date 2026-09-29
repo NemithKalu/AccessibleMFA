@@ -12,6 +12,13 @@
   you can replace them using a recovery code.
 </p>
 
+<%# recover.js is shared with /recover/status, where it does announce through
+    #status; this page's own form is a plain full-page POST that never
+    touches it, but the live region is included anyway, matching every other
+    page that loads a /js/ script, so the shared script always has somewhere
+    safe to write if that ever changes. %>
+<%- include('partials/status') %>
+
 <h2>What happens after you enter a code</h2>
 <%#
   Set out in full, before the user commits to anything. A 24 hour wait is a
